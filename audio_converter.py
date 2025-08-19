@@ -15,7 +15,7 @@ warnings.filterwarnings('ignore')
 # ファイルパス設定（ここを編集してください）
 # ========================================
 INPUT_PATH = "jvs_data/VOICEACTRESS100_001.wav"  # 変換したいファイル/フォルダのパス
-OUTPUT_DIR = None     # 出力ディレクトリ (Noneで同じ場所に保存)
+OUTPUT_DIR = None     # 出力ディレクトリ (Noneで同じ場所に保存)ti
 # ========================================
 
 try:
