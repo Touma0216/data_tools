@@ -68,7 +68,32 @@ class TTSEngine:
     
     def get_available_styles(self):
         """利用可能な感情スタイルを取得"""
-        # Style-Bert-VITS2の一般的な感情
+        if not self.is_loaded or not self.model:
+            return ["Neutral"]
+        
+        # モデルから実際の感情リストを取得を試みる
+        try:
+            # config.jsonから感情情報を取得
+            import json
+            with open(self.model_info.get('config_path', ''), 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            # 学習済み感情を確認
+            if 'data' in config and 'emotions' in config['data']:
+                emotions = config['data']['emotions']
+                print(f"学習済み感情: {emotions}")
+                return emotions
+            elif 'emotions' in config:
+                emotions = config['emotions']
+                print(f"学習済み感情: {emotions}")
+                return emotions
+            else:
+                print("config.jsonに感情情報が見つかりません")
+                
+        except Exception as e:
+            print(f"感情情報取得エラー: {e}")
+        
+        # デフォルト（一般的な感情リスト）
         return [
             "Neutral",
             "Happy", 
@@ -126,6 +151,8 @@ class TTSEngine:
         sig = inspect.signature(self.model.infer)
         method_params = sig.parameters
         
+        print(f"利用可能なパラメータ: {list(method_params.keys())}")
+        
         # テキスト引数
         kwargs = {}
         if "text" in method_params:
@@ -138,26 +165,70 @@ class TTSEngine:
         # スタイル系
         if "style" in method_params:
             kwargs["style"] = params.get('style', 'Neutral')
+            print(f"styleをセット: {params.get('style', 'Neutral')}")
+        else:
+            print("警告: styleパラメータが見つかりません")
+            
         if "style_weight" in method_params:
             kwargs["style_weight"] = params.get('style_weight', 1.0)
+            print(f"style_weightをセット: {params.get('style_weight', 1.0)}")
+        elif "emotion_weight" in method_params:
+            kwargs["emotion_weight"] = params.get('style_weight', 1.0)
+            print(f"emotion_weightをセット: {params.get('style_weight', 1.0)}")
+        else:
+            print("警告: 感情強度パラメータが見つかりません")
             
-        # 長さ
+        # 長さ系（複数のパラメータ名をチェック）
+        length_scale = params.get('length_scale', 0.85)
+        print(f"length_scale設定値: {length_scale}")
+        
         if "length_scale" in method_params:
-            kwargs["length_scale"] = params.get('length_scale', 0.85)
+            kwargs["length_scale"] = length_scale
+            print(f"length_scaleをセット: {length_scale}")
+        elif "duration_scale" in method_params:
+            kwargs["duration_scale"] = length_scale
+            print(f"duration_scaleをセット: {length_scale}")
+        elif "speed" in method_params:
+            # speedの場合は逆数になることが多い
+            speed_value = 1.0 / length_scale
+            kwargs["speed"] = speed_value
+            print(f"speedをセット: {speed_value} (length_scale {length_scale}の逆数)")
+        elif "length" in method_params:
+            kwargs["length"] = length_scale
+            print(f"lengthをセット: {length_scale}")
+        else:
+            print(f"警告: 話速パラメータが見つかりません。利用可能: {list(method_params.keys())}")
             
         # SDP
+        sdp_value = params.get('sdp_ratio', 0.25)
+        print(f"sdp_ratio設定値: {sdp_value}")
+        
         if "sdp_ratio" in method_params:
-            kwargs["sdp_ratio"] = params.get('sdp_ratio', 0.25)
+            kwargs["sdp_ratio"] = sdp_value
+            print(f"sdp_ratioをセット: {sdp_value}")
+        elif "sdp" in method_params:
+            kwargs["sdp"] = sdp_value  
+            print(f"sdpをセット: {sdp_value}")
+        else:
+            print("警告: SDPパラメータが見つかりません")
             
         # ノイズ系（優先順位: noise > noise_scale_w > noise_scale）
         noise_value = params.get('noise', 0.35)
+        print(f"noise設定値: {noise_value}")
+        
         if "noise" in method_params:
             kwargs["noise"] = noise_value
+            print(f"noiseをセット: {noise_value}")
         elif "noise_scale_w" in method_params:
             kwargs["noise_scale_w"] = noise_value
+            print(f"noise_scale_wをセット: {noise_value}")
         elif "noise_scale" in method_params:
             kwargs["noise_scale"] = noise_value
-            
+            print(f"noise_scaleをセット: {noise_value}")
+        else:
+            print("警告: ノイズパラメータが見つかりません")
+        
+        print(f"設定されたパラメータ: {kwargs}")
         return kwargs
     
     def get_model_info(self):

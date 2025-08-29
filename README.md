@@ -3,6 +3,7 @@ data_tools/
 ├── ui/
 │   ├── __init__.py
 │   ├── main_window.py   # メインウィンドウ
+│   ├── emotion_control.py # 感情コントロール
 │   ├── model_history.py # モデル履歴保持
 │   └── model_loader.py  # モデル選択・読み込みUI
 ├── core/

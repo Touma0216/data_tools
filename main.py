@@ -9,6 +9,7 @@ from PyQt6.QtGui import QFont
 # 自作モジュール
 from ui.model_loader import ModelLoaderDialog
 from ui.model_history import ModelHistoryWidget
+from ui.emotion_control import EmotionControlWidget
 from core.tts_engine import TTSEngine
 from core.model_manager import ModelManager
 
@@ -21,6 +22,9 @@ class TTSStudioMainWindow(QMainWindow):
         
         # モデル管理初期化
         self.model_manager = ModelManager()
+        
+        # 現在の音声パラメータ
+        self.current_audio_params = {}
         
         self.init_ui()
         
@@ -101,22 +105,13 @@ class TTSStudioMainWindow(QMainWindow):
             }
         """)
         
-        # パラメータエリア（仮）
+        # パラメータエリア
         params_label = QLabel("音声パラメータ:")
         params_label.setFont(QFont("", 10, QFont.Weight.Bold))
         
-        params_placeholder = QLabel("（感情制御・パラメータ調整エリア - 後で実装）")
-        params_placeholder.setStyleSheet("""
-            QLabel {
-                padding: 20px;
-                background-color: #f5f5f5;
-                border: 1px dashed #ccc;
-                border-radius: 4px;
-                text-align: center;
-                color: #666;
-            }
-        """)
-        params_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # 感情制御ウィジェット
+        self.emotion_control = EmotionControlWidget(self.tts_engine)
+        self.emotion_control.parameters_changed.connect(self.on_parameters_changed)
         
         # 制御ボタン
         controls_layout = QHBoxLayout()
@@ -156,7 +151,7 @@ class TTSStudioMainWindow(QMainWindow):
         left_layout.addWidget(text_label)
         left_layout.addWidget(self.text_input)
         left_layout.addWidget(params_label)
-        left_layout.addWidget(params_placeholder, 1)  # 伸縮可能
+        left_layout.addWidget(self.emotion_control, 1)  # 伸縮可能
         left_layout.addLayout(controls_layout)
         
         # 右側: モデル履歴
@@ -203,6 +198,9 @@ class TTSStudioMainWindow(QMainWindow):
             
             # 履歴リストを更新
             self.model_history.refresh_list()
+            
+            # 感情リストを更新
+            self.emotion_control.set_tts_engine(self.tts_engine)
         else:
             self.update_model_status("読み込み失敗", False)
     
@@ -214,6 +212,11 @@ class TTSStudioMainWindow(QMainWindow):
             'style_path': model_data['style_path']
         }
         self.load_model(paths)
+    
+    def on_parameters_changed(self, params):
+        """感情制御パラメータが変更された時の処理"""
+        self.current_audio_params = params
+        print(f"パラメータ更新: {params}")
     
     def play_audio(self):
         """音声を再生"""
@@ -232,7 +235,7 @@ class TTSStudioMainWindow(QMainWindow):
             self.play_btn.setText("再生中...")
             
             # 音声合成
-            sr, audio = self.tts_engine.synthesize(text)
+            sr, audio = self.tts_engine.synthesize(text, **self.current_audio_params)
             
             # バックグラウンドで再生
             import sounddevice as sd
@@ -276,7 +279,7 @@ class TTSStudioMainWindow(QMainWindow):
                 self.save_btn.setText("保存中...")
                 
                 # 音声合成
-                sr, audio = self.tts_engine.synthesize(text)
+                sr, audio = self.tts_engine.synthesize(text, **self.current_audio_params)
                 
                 # ファイル保存
                 sf.write(file_path, audio, sr)
