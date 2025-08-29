@@ -228,6 +228,17 @@ class TTSEngine:
         else:
             print("警告: ノイズパラメータが見つかりません")
         
+        # ピッチとイントネーション（新発見！）
+        if "pitch_scale" in method_params:
+            pitch_value = params.get('pitch_scale', 1.0)
+            kwargs["pitch_scale"] = pitch_value
+            print(f"pitch_scaleをセット: {pitch_value}")
+        
+        if "intonation_scale" in method_params:
+            intonation_value = params.get('intonation_scale', 1.0)
+            kwargs["intonation_scale"] = intonation_value
+            print(f"intonation_scaleをセット: {intonation_value}")
+        
         print(f"設定されたパラメータ: {kwargs}")
         return kwargs
     

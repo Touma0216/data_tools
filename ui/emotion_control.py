@@ -18,9 +18,11 @@ class EmotionControlWidget(QWidget):
         self.current_params = {
             'style': 'Neutral',
             'style_weight': 1.0,
+            'length_scale': 0.85,
+            'pitch_scale': 1.0,
+            'intonation_scale': 1.0,
             'sdp_ratio': 0.25,
-            'noise': 0.35,
-            'length_scale': 0.85
+            'noise': 0.35
         }
         
         self.init_ui()
@@ -178,8 +180,10 @@ class EmotionControlWidget(QWidget):
         # パラメータ定義
         params = [
             ("話速", "length_scale", 0.3, 1.8, 0.85, "超速い ← → 超遅い"),
-            ("ピッチ変動", "sdp_ratio", 0.0, 0.5, 0.25, "単調 ← → 抑揚"),
-            ("ノイズ", "noise", 0.1, 0.7, 0.35, "クリア ← → 自然")
+            ("ピッチ", "pitch_scale", 0.5, 1.5, 1.0, "低音 ← → 高音"),
+            ("抑揚", "intonation_scale", 0.5, 1.5, 1.0, "平坦 ← → 抑揚"),
+            ("SDP比率", "sdp_ratio", 0.0, 0.8, 0.25, "単調 ← → 変化"),
+            ("ノイズ", "noise", 0.0, 1.0, 0.35, "クリア ← → 自然")
         ]
         
         self.param_sliders = {}
@@ -248,10 +252,22 @@ class EmotionControlWidget(QWidget):
         
         # プリセット定義
         presets = [
-            ("標準", {'style': 'Neutral', 'style_weight': 1.0, 'sdp_ratio': 0.25, 'noise': 0.35, 'length_scale': 0.85}),
-            ("元気", {'style': 'Happy', 'style_weight': 1.2, 'sdp_ratio': 0.3, 'noise': 0.4, 'length_scale': 0.6}),  # 速く
-            ("落ち着き", {'style': 'Neutral', 'style_weight': 0.8, 'sdp_ratio': 0.2, 'noise': 0.3, 'length_scale': 1.2}),  # 遅く
-            ("感情豊か", {'style': 'Happy', 'style_weight': 1.5, 'sdp_ratio': 0.35, 'noise': 0.45, 'length_scale': 0.75}),
+            ("標準", {
+                'style': 'Neutral', 'style_weight': 1.0, 'length_scale': 0.85,
+                'pitch_scale': 1.0, 'intonation_scale': 1.0, 'sdp_ratio': 0.25, 'noise': 0.35
+            }),
+            ("高音・速め", {
+                'style': 'Happy', 'style_weight': 1.2, 'length_scale': 0.6,
+                'pitch_scale': 1.3, 'intonation_scale': 1.2, 'sdp_ratio': 0.4, 'noise': 0.4
+            }),
+            ("低音・ゆっくり", {
+                'style': 'Neutral', 'style_weight': 0.8, 'length_scale': 1.2,
+                'pitch_scale': 0.7, 'intonation_scale': 0.8, 'sdp_ratio': 0.15, 'noise': 0.3
+            }),
+            ("感情豊か", {
+                'style': 'Happy', 'style_weight': 1.5, 'length_scale': 0.75,
+                'pitch_scale': 1.1, 'intonation_scale': 1.4, 'sdp_ratio': 0.6, 'noise': 0.5
+            }),
         ]
         
         for i, (name, params) in enumerate(presets):
