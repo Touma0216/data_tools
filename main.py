@@ -202,6 +202,19 @@ class TTSStudioMainWindow(QMainWindow):
         main_layout.addLayout(header_layout)
         main_layout.addLayout(content_layout)
     
+    def trim_silence(self, audio, sample_rate, threshold=0.03):
+        """音声データの末尾無音を削除"""
+        import numpy as np
+        
+        # 末尾から逆向きに検索して、閾値以上の音がある位置を見つける
+        for i in range(len(audio) - 1, -1, -1):
+            if abs(audio[i]) > threshold:
+                # 0.02秒のバッファを残して切る
+                buffer_samples = int(sample_rate * 0.02)
+                end_pos = min(i + buffer_samples, len(audio))
+                return audio[:end_pos]
+        return audio
+    
     def on_text_row_added(self, row_id, row_number):
         """テキスト行が追加された時"""
         self.tabbed_emotion_control.add_text_row(row_id, row_number)
@@ -324,7 +337,6 @@ class TTSStudioMainWindow(QMainWindow):
                     }
                 
                 print(f"  {i}. 合成中: {text}")
-                print(f"      パラメータ: {tab_parameters}")
                 
                 sr, audio = self.tts_engine.synthesize(text, **tab_parameters)
                 
@@ -333,19 +345,33 @@ class TTSStudioMainWindow(QMainWindow):
                 
                 all_audio.append(audio)
             
-            # 音声を結合（間に0.5秒の無音を挿入）
+            # 音声を結合（末尾無音削除）
             import numpy as np
-            silence_duration = 0.5
-            silence_samples = int(sample_rate * silence_duration)
-            silence = np.zeros(silence_samples)
             
             combined_audio = []
             for i, audio in enumerate(all_audio):
+                # 音声データをfloat32に正規化
+                if audio.dtype != np.float32:
+                    audio = audio.astype(np.float32)
+                
+                # 音量を制限（クリッピング防止）
+                max_val = np.abs(audio).max()
+                if max_val > 0.8:
+                    audio = audio * (0.8 / max_val)
+                
+                # 末尾無音を削除
+                audio = self.trim_silence(audio, sample_rate)
+                print(f"音声 {i+1}: 元の長さ {len(all_audio[i])/sample_rate:.2f}秒 → 無音削除後 {len(audio)/sample_rate:.2f}秒")
+                
                 combined_audio.append(audio)
-                if i < len(all_audio) - 1:  # 最後以外に無音を挿入
-                    combined_audio.append(silence)
             
-            final_audio = np.concatenate(combined_audio)
+            final_audio = np.concatenate(combined_audio).astype(np.float32)
+            
+            # 最終的なクリッピング防止
+            max_final = np.abs(final_audio).max()
+            if max_final > 0.9:
+                final_audio = final_audio * (0.9 / max_final)
+                print(f"音量調整: {max_final:.3f} → 0.9")
             
             # バックグラウンドで再生
             import sounddevice as sd
@@ -478,18 +504,30 @@ class TTSStudioMainWindow(QMainWindow):
                     
                     all_audio.append(audio)
                 
-                # 音声を結合（間に0.5秒の無音を挿入）
-                silence_duration = 0.5
-                silence_samples = int(sample_rate * silence_duration)
-                silence = np.zeros(silence_samples)
-                
+                # 音声を結合（末尾無音削除）
                 combined_audio = []
                 for i, audio in enumerate(all_audio):
+                    # 音声データをfloat32に正規化
+                    if audio.dtype != np.float32:
+                        audio = audio.astype(np.float32)
+                    
+                    # 音量を制限（クリッピング防止）
+                    max_val = np.abs(audio).max()
+                    if max_val > 0.8:
+                        audio = audio * (0.8 / max_val)
+                    
+                    # 末尾無音を削除
+                    audio = self.trim_silence(audio, sample_rate)
+                    
                     combined_audio.append(audio)
-                    if i < len(all_audio) - 1:  # 最後以外に無音を挿入
-                        combined_audio.append(silence)
                 
-                final_audio = np.concatenate(combined_audio)
+                final_audio = np.concatenate(combined_audio).astype(np.float32)
+                
+                # 最終的なクリッピング防止
+                max_final = np.abs(final_audio).max()
+                if max_final > 0.9:
+                    final_audio = final_audio * (0.9 / max_final)
+                    print(f"保存時音量調整: {max_final:.3f} → 0.9")
                 
                 # ファイル保存
                 sf.write(file_path, final_audio, sample_rate)
