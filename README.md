@@ -1,9 +1,11 @@
 data_tools/
 ├── main.py              # メインエントリーポイント
+├── model_history.json   # モデルの履歴
 ├── ui/
 │   ├── __init__.py
 │   ├── main_window.py   # メインウィンドウ
-│   ├── emotion_control.py # 感情コントロール
+│   ├── tabbed_emotion_control.py # 感情コントロール
+│   ├── multi_text.py # 複数テキスト対応
 │   ├── model_history.py # モデル履歴保持
 │   └── model_loader.py  # モデル選択・読み込みUI
 ├── core/

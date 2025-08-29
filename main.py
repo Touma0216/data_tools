@@ -2,14 +2,15 @@ import sys
 import os
 from pathlib import Path
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                            QHBoxLayout, QPushButton, QLabel, QTextEdit, QMessageBox)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+                            QHBoxLayout, QPushButton, QLabel, QFileDialog)
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
 # 自作モジュール
 from ui.model_loader import ModelLoaderDialog
 from ui.model_history import ModelHistoryWidget
-from ui.emotion_control import EmotionControlWidget
+from ui.tabbed_emotion_control import TabbedEmotionControl
+from ui.multi_text import MultiTextWidget
 from core.tts_engine import TTSEngine
 from core.model_manager import ModelManager
 
@@ -23,16 +24,13 @@ class TTSStudioMainWindow(QMainWindow):
         # モデル管理初期化
         self.model_manager = ModelManager()
         
-        # 現在の音声パラメータ
-        self.current_audio_params = {}
-        
         self.init_ui()
         
     def init_ui(self):
         """UIの初期化"""
         # ウィンドウ設定
         self.setWindowTitle("TTSスタジオ - ほのかちゃん")
-        self.setGeometry(100, 100, 1000, 700)
+        self.setGeometry(100, 100, 1200, 800)
         
         # 中央ウィジェット
         central_widget = QWidget()
@@ -74,9 +72,6 @@ class TTSStudioMainWindow(QMainWindow):
             QPushButton:hover {
                 background-color: #1976d2;
             }
-            QPushButton:pressed {
-                background-color: #0d47a1;
-            }
         """)
         self.load_model_btn.clicked.connect(self.open_model_loader)
         
@@ -89,69 +84,108 @@ class TTSStudioMainWindow(QMainWindow):
         # 左側: テキスト入力とコントロール
         left_layout = QVBoxLayout()
         
-        # テキスト入力エリア
-        text_label = QLabel("テキスト入力:")
-        text_label.setFont(QFont("", 10, QFont.Weight.Bold))
-        
-        self.text_input = QTextEdit()
-        self.text_input.setPlaceholderText("ここに読み上げたいテキストを入力してください...")
-        self.text_input.setMinimumHeight(150)
-        self.text_input.setStyleSheet("""
-            QTextEdit {
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                padding: 8px;
-                font-size: 14px;
-            }
-        """)
+        # 複数テキスト入力エリア
+        self.multi_text = MultiTextWidget()
+        self.multi_text.play_single_requested.connect(self.play_single_text)
+        self.multi_text.row_added.connect(self.on_text_row_added)
+        self.multi_text.row_removed.connect(self.on_text_row_removed)
+        self.multi_text.row_numbers_updated.connect(self.on_row_numbers_updated)
         
         # パラメータエリア
         params_label = QLabel("音声パラメータ:")
         params_label.setFont(QFont("", 10, QFont.Weight.Bold))
         
-        # 感情制御ウィジェット
-        self.emotion_control = EmotionControlWidget(self.tts_engine)
-        self.emotion_control.parameters_changed.connect(self.on_parameters_changed)
+        # タブ式感情制御ウィジェット
+        self.tabbed_emotion_control = TabbedEmotionControl()
+        self.tabbed_emotion_control.parameters_changed.connect(self.on_parameters_changed)
         
-        # 制御ボタン
+        # 初期タブを作成（MultiTextWidgetの初期行 "initial" に対応）
+        self.tabbed_emotion_control.add_text_row("initial", 1)
+        
+        # 制御ボタン（新しい3つ）
         controls_layout = QHBoxLayout()
-        
-        self.play_btn = QPushButton("▶ 再生")
-        self.save_btn = QPushButton("💾 保存")
-        
-        for btn in [self.play_btn, self.save_btn]:
-            btn.setMinimumHeight(40)
-            btn.setEnabled(False)  # 最初は無効
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #4caf50;
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    font-size: 14px;
-                    font-weight: bold;
-                }
-                QPushButton:hover:enabled {
-                    background-color: #45a049;
-                }
-                QPushButton:disabled {
-                    background-color: #cccccc;
-                    color: #666666;
-                }
-            """)
-        
-        self.play_btn.clicked.connect(self.play_audio)
-        self.save_btn.clicked.connect(self.save_audio)
-        
         controls_layout.addStretch()
-        controls_layout.addWidget(self.play_btn)
-        controls_layout.addWidget(self.save_btn)
+        
+        # 連続再生ボタン
+        self.sequential_play_btn = QPushButton("連続して再生")
+        self.sequential_play_btn.setMinimumHeight(40)
+        self.sequential_play_btn.setEnabled(False)
+        self.sequential_play_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #ff9800;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                font-size: 13px;
+                font-weight: bold;
+                padding: 0 16px;
+            }
+            QPushButton:hover:enabled {
+                background-color: #f57c00;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+                color: #666666;
+            }
+        """)
+        self.sequential_play_btn.clicked.connect(self.play_sequential)
+        
+        # 個別保存ボタン
+        self.save_individual_btn = QPushButton("個別保存")
+        self.save_individual_btn.setMinimumHeight(40)
+        self.save_individual_btn.setEnabled(False)
+        self.save_individual_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4caf50;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                font-size: 13px;
+                font-weight: bold;
+                padding: 0 16px;
+            }
+            QPushButton:hover:enabled {
+                background-color: #45a049;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+                color: #666666;
+            }
+        """)
+        self.save_individual_btn.clicked.connect(self.save_individual)
+        
+        # 連続保存ボタン
+        self.save_continuous_btn = QPushButton("連続保存")
+        self.save_continuous_btn.setMinimumHeight(40)
+        self.save_continuous_btn.setEnabled(False)
+        self.save_continuous_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #9c27b0;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                font-size: 13px;
+                font-weight: bold;
+                padding: 0 16px;
+            }
+            QPushButton:hover:enabled {
+                background-color: #7b1fa2;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+                color: #666666;
+            }
+        """)
+        self.save_continuous_btn.clicked.connect(self.save_continuous)
+        
+        controls_layout.addWidget(self.sequential_play_btn)
+        controls_layout.addWidget(self.save_individual_btn)
+        controls_layout.addWidget(self.save_continuous_btn)
         
         # 左側レイアウト組み立て
-        left_layout.addWidget(text_label)
-        left_layout.addWidget(self.text_input)
+        left_layout.addWidget(self.multi_text, 1)
         left_layout.addWidget(params_label)
-        left_layout.addWidget(self.emotion_control, 1)  # 伸縮可能
+        left_layout.addWidget(self.tabbed_emotion_control, 1)
         left_layout.addLayout(controls_layout)
         
         # 右側: モデル履歴
@@ -161,12 +195,24 @@ class TTSStudioMainWindow(QMainWindow):
         self.model_history.setMinimumWidth(250)
         
         # メインコンテンツレイアウト
-        content_layout.addLayout(left_layout, 1)  # 左側が伸縮
-        content_layout.addWidget(self.model_history, 0)  # 右側は固定幅
+        content_layout.addLayout(left_layout, 1)
+        content_layout.addWidget(self.model_history, 0)
         
         # レイアウトに追加
         main_layout.addLayout(header_layout)
         main_layout.addLayout(content_layout)
+    
+    def on_text_row_added(self, row_id, row_number):
+        """テキスト行が追加された時"""
+        self.tabbed_emotion_control.add_text_row(row_id, row_number)
+    
+    def on_text_row_removed(self, row_id):
+        """テキスト行が削除された時"""
+        self.tabbed_emotion_control.remove_text_row(row_id)
+    
+    def on_row_numbers_updated(self, row_mapping):
+        """行番号が更新された時"""
+        self.tabbed_emotion_control.update_tab_numbers(row_mapping)
         
     def open_model_loader(self):
         """モデル読み込みダイアログを開く"""
@@ -178,7 +224,6 @@ class TTSStudioMainWindow(QMainWindow):
         """モデルを読み込む"""
         self.update_model_status("読み込み中...", False)
         
-        # 別スレッドでモデル読み込み（UIフリーズ防止）
         success = self.tts_engine.load_model(
             paths['model_path'],
             paths['config_path'], 
@@ -198,9 +243,6 @@ class TTSStudioMainWindow(QMainWindow):
             
             # 履歴リストを更新
             self.model_history.refresh_list()
-            
-            # 感情リストを更新
-            self.emotion_control.set_tts_engine(self.tts_engine)
         else:
             self.update_model_status("読み込み失敗", False)
     
@@ -213,86 +255,254 @@ class TTSStudioMainWindow(QMainWindow):
         }
         self.load_model(paths)
     
-    def on_parameters_changed(self, params):
+    def on_parameters_changed(self, row_id, params):
         """感情制御パラメータが変更された時の処理"""
-        self.current_audio_params = params
-        print(f"パラメータ更新: {params}")
+        print(f"行 {row_id} のパラメータ更新: {params}")
     
-    def play_audio(self):
-        """音声を再生"""
+    def play_single_text(self, row_id, text, parameters):
+        """単一テキストを再生（個別パラメータ使用）"""
         if not self.tts_engine.is_loaded:
             print("モデルが読み込まれていません")
             return
-            
-        text = self.text_input.toPlainText().strip()
-        if not text:
-            print("テキストを入力してください")
-            return
+        
+        # タブ式コントロールから個別パラメータを取得
+        tab_parameters = self.tabbed_emotion_control.get_parameters(row_id)
+        if tab_parameters:
+            parameters = tab_parameters
+            print(f"タブパラメータ使用: {tab_parameters}")
+        else:
+            print(f"デフォルトパラメータ使用: {parameters}")
         
         try:
-            # 再生ボタンを一時無効化
-            self.play_btn.setEnabled(False)
-            self.play_btn.setText("再生中...")
+            print(f"行 {row_id} を再生: {text}")
             
             # 音声合成
-            sr, audio = self.tts_engine.synthesize(text, **self.current_audio_params)
+            sr, audio = self.tts_engine.synthesize(text, **parameters)
             
             # バックグラウンドで再生
             import sounddevice as sd
-            sd.play(audio, sr, blocking=False)  # non-blocking再生
-            
-            # ボタンを元に戻す
-            self.play_btn.setEnabled(True)
-            self.play_btn.setText("▶ 再生")
+            sd.play(audio, sr, blocking=False)
             
         except Exception as e:
             print(f"音声合成エラー: {str(e)}")
-            self.play_btn.setEnabled(True)
-            self.play_btn.setText("▶ 再生")
     
-    def save_audio(self):
-        """音声をファイルに保存"""
+    def play_sequential(self):
+        """連続して再生（1→2→3の順で、各タブのパラメータ使用）"""
         if not self.tts_engine.is_loaded:
             print("モデルが読み込まれていません")
             return
-            
-        text = self.text_input.toPlainText().strip()
-        if not text:
+        
+        # 全テキストを取得
+        texts_data = self.multi_text.get_all_texts_and_parameters()
+        if not texts_data:
             print("テキストを入力してください")
             return
         
         try:
-            from PyQt6.QtWidgets import QFileDialog
+            print(f"連続再生開始: {len(texts_data)}件")
+            
+            # ボタンを一時無効化
+            self.sequential_play_btn.setEnabled(False)
+            self.sequential_play_btn.setText("再生中...")
+            
+            # 全ての音声を合成（各行の個別パラメータ使用）
+            all_audio = []
+            sample_rate = None
+            
+            for i, data in enumerate(texts_data, 1):
+                text = data['text']
+                row_id = data['row_id']
+                
+                # 対応するタブのパラメータを取得
+                tab_parameters = self.tabbed_emotion_control.get_parameters(row_id)
+                if not tab_parameters:
+                    # デフォルトパラメータ
+                    tab_parameters = {
+                        'style': 'Neutral', 'style_weight': 1.0,
+                        'length_scale': 0.85, 'pitch_scale': 1.0,
+                        'intonation_scale': 1.0, 'sdp_ratio': 0.25, 'noise': 0.35
+                    }
+                
+                print(f"  {i}. 合成中: {text}")
+                print(f"      パラメータ: {tab_parameters}")
+                
+                sr, audio = self.tts_engine.synthesize(text, **tab_parameters)
+                
+                if sample_rate is None:
+                    sample_rate = sr
+                
+                all_audio.append(audio)
+            
+            # 音声を結合（間に0.5秒の無音を挿入）
+            import numpy as np
+            silence_duration = 0.5
+            silence_samples = int(sample_rate * silence_duration)
+            silence = np.zeros(silence_samples)
+            
+            combined_audio = []
+            for i, audio in enumerate(all_audio):
+                combined_audio.append(audio)
+                if i < len(all_audio) - 1:  # 最後以外に無音を挿入
+                    combined_audio.append(silence)
+            
+            final_audio = np.concatenate(combined_audio)
+            
+            # バックグラウンドで再生
+            import sounddevice as sd
+            sd.play(final_audio, sample_rate, blocking=False)
+            
+            print(f"連続再生完了: 総時間 {len(final_audio)/sample_rate:.1f}秒")
+            
+            # ボタンを元に戻す
+            self.sequential_play_btn.setEnabled(True)
+            self.sequential_play_btn.setText("連続して再生")
+            
+        except Exception as e:
+            print(f"連続再生エラー: {str(e)}")
+            self.sequential_play_btn.setEnabled(True)
+            self.sequential_play_btn.setText("連続して再生")
+    
+    def save_individual(self):
+        """個別保存（フォルダ内に個別ファイル）"""
+        if not self.tts_engine.is_loaded:
+            print("モデルが読み込まれていません")
+            return
+        
+        texts_data = self.multi_text.get_all_texts_and_parameters()
+        if not texts_data:
+            print("テキストを入力してください")
+            return
+        
+        try:
             import soundfile as sf
             
-            # 保存先選択
+            # フォルダ選択
+            folder_path = QFileDialog.getExistingDirectory(
+                self,
+                "個別保存フォルダを選択"
+            )
+            
+            if folder_path:
+                # 保存ボタンを一時無効化
+                self.save_individual_btn.setEnabled(False)
+                self.save_individual_btn.setText("保存中...")
+                
+                # 各行を個別に保存
+                for i, data in enumerate(texts_data, 1):
+                    text = data['text']
+                    row_id = data['row_id']
+                    
+                    # 対応するタブのパラメータを取得
+                    tab_parameters = self.tabbed_emotion_control.get_parameters(row_id)
+                    if not tab_parameters:
+                        tab_parameters = {
+                            'style': 'Neutral', 'style_weight': 1.0,
+                            'length_scale': 0.85, 'pitch_scale': 1.0,
+                            'intonation_scale': 1.0, 'sdp_ratio': 0.25, 'noise': 0.35
+                        }
+                    
+                    print(f"個別保存 {i}: {text}")
+                    sr, audio = self.tts_engine.synthesize(text, **tab_parameters)
+                    
+                    # ファイル名生成
+                    safe_text = "".join(c for c in text[:20] if c.isalnum() or c in (' ', '-', '_')).rstrip()
+                    if not safe_text:
+                        safe_text = f"text_{i}"
+                    filename = f"{i:02d}_{safe_text}.wav"
+                    file_path = os.path.join(folder_path, filename)
+                    
+                    sf.write(file_path, audio, sr)
+                    print(f"保存完了: {filename}")
+                
+                print(f"個別保存完了: {len(texts_data)}ファイル → {folder_path}")
+                
+                # ボタンを元に戻す
+                self.save_individual_btn.setEnabled(True)
+                self.save_individual_btn.setText("個別保存")
+                
+        except Exception as e:
+            print(f"個別保存エラー: {str(e)}")
+            self.save_individual_btn.setEnabled(True)
+            self.save_individual_btn.setText("個別保存")
+    
+    def save_continuous(self):
+        """連続保存（1つのWAVファイルに統合）"""
+        if not self.tts_engine.is_loaded:
+            print("モデルが読み込まれていません")
+            return
+        
+        texts_data = self.multi_text.get_all_texts_and_parameters()
+        if not texts_data:
+            print("テキストを入力してください")
+            return
+        
+        try:
+            import soundfile as sf
+            import numpy as np
+            
+            # ファイル保存先選択
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
-                "音声ファイルを保存",
-                "output.wav",
+                "連続音声ファイルを保存",
+                "continuous_output.wav",
                 "WAV files (*.wav);;All files (*.*)"
             )
             
             if file_path:
                 # 保存ボタンを一時無効化
-                self.save_btn.setEnabled(False)
-                self.save_btn.setText("保存中...")
+                self.save_continuous_btn.setEnabled(False)
+                self.save_continuous_btn.setText("保存中...")
                 
-                # 音声合成
-                sr, audio = self.tts_engine.synthesize(text, **self.current_audio_params)
+                # 全ての音声を合成
+                all_audio = []
+                sample_rate = None
+                
+                for i, data in enumerate(texts_data, 1):
+                    text = data['text']
+                    row_id = data['row_id']
+                    
+                    # 対応するタブのパラメータを取得
+                    tab_parameters = self.tabbed_emotion_control.get_parameters(row_id)
+                    if not tab_parameters:
+                        tab_parameters = {
+                            'style': 'Neutral', 'style_weight': 1.0,
+                            'length_scale': 0.85, 'pitch_scale': 1.0,
+                            'intonation_scale': 1.0, 'sdp_ratio': 0.25, 'noise': 0.35
+                        }
+                    
+                    print(f"連続保存合成 {i}/{len(texts_data)}: {text}")
+                    sr, audio = self.tts_engine.synthesize(text, **tab_parameters)
+                    
+                    if sample_rate is None:
+                        sample_rate = sr
+                    
+                    all_audio.append(audio)
+                
+                # 音声を結合（間に0.5秒の無音を挿入）
+                silence_duration = 0.5
+                silence_samples = int(sample_rate * silence_duration)
+                silence = np.zeros(silence_samples)
+                
+                combined_audio = []
+                for i, audio in enumerate(all_audio):
+                    combined_audio.append(audio)
+                    if i < len(all_audio) - 1:  # 最後以外に無音を挿入
+                        combined_audio.append(silence)
+                
+                final_audio = np.concatenate(combined_audio)
                 
                 # ファイル保存
-                sf.write(file_path, audio, sr)
-                print(f"音声ファイルを保存: {file_path}")
+                sf.write(file_path, final_audio, sample_rate)
+                print(f"連続保存完了: {file_path} ({len(final_audio)/sample_rate:.1f}秒)")
                 
                 # ボタンを元に戻す
-                self.save_btn.setEnabled(True)
-                self.save_btn.setText("💾 保存")
+                self.save_continuous_btn.setEnabled(True)
+                self.save_continuous_btn.setText("連続保存")
                 
         except Exception as e:
-            print(f"保存エラー: {str(e)}")
-            self.save_btn.setEnabled(True)
-            self.save_btn.setText("💾 保存")
+            print(f"連続保存エラー: {str(e)}")
+            self.save_continuous_btn.setEnabled(True)
+            self.save_continuous_btn.setText("連続保存")
         
     def update_model_status(self, status_text, is_loaded=False):
         """モデル読み込み状態を更新"""
@@ -310,9 +520,10 @@ class TTSStudioMainWindow(QMainWindow):
                     font-weight: bold;
                 }
             """)
-            # ボタンを有効化
-            self.play_btn.setEnabled(True)
-            self.save_btn.setEnabled(True)
+            # 新しいボタンを有効化
+            self.sequential_play_btn.setEnabled(True)
+            self.save_individual_btn.setEnabled(True)
+            self.save_continuous_btn.setEnabled(True)
         else:
             # 読み込み失敗または未読み込み
             self.model_status_label.setStyleSheet("""
@@ -325,9 +536,10 @@ class TTSStudioMainWindow(QMainWindow):
                     font-weight: bold;
                 }
             """)
-            # ボタンを無効化
-            self.play_btn.setEnabled(False)
-            self.save_btn.setEnabled(False)
+            # 新しいボタンを無効化
+            self.sequential_play_btn.setEnabled(False)
+            self.save_individual_btn.setEnabled(False)
+            self.save_continuous_btn.setEnabled(False)
 
 def main():
     """メイン関数"""

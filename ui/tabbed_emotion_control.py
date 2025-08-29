@@ -1,21 +1,18 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider, 
-                            QComboBox, QDoubleSpinBox, QGroupBox, QGridLayout, QPushButton)
+                            QComboBox, QDoubleSpinBox, QGroupBox, QGridLayout, QPushButton, QTabWidget)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 
-class EmotionControlWidget(QWidget):
-    """感情・パラメータ制御ウィジェット"""
+class SingleEmotionControl(QWidget):
+    """単一行の感情制御ウィジェット"""
     
-    # パラメータ変更シグナル
-    parameters_changed = pyqtSignal(dict)
+    parameters_changed = pyqtSignal(str, dict)  # row_id, parameters
     
-    def __init__(self, tts_engine=None, parent=None):
+    def __init__(self, row_id, parameters=None, parent=None):
         super().__init__(parent)
         
-        self.tts_engine = tts_engine
-        
-        # 現在のパラメータ
-        self.current_params = {
+        self.row_id = row_id
+        self.current_params = parameters or {
             'style': 'Neutral',
             'style_weight': 1.0,
             'length_scale': 0.85,
@@ -26,6 +23,7 @@ class EmotionControlWidget(QWidget):
         }
         
         self.init_ui()
+        self.load_parameters()
         
     def init_ui(self):
         """UIを初期化"""
@@ -45,7 +43,7 @@ class EmotionControlWidget(QWidget):
         preset_group = self.create_preset_group()
         layout.addWidget(preset_group)
         
-        layout.addStretch()  # 下部の余白
+        layout.addStretch()
         
     def create_emotion_group(self):
         """感情制御グループを作成"""
@@ -75,27 +73,18 @@ class EmotionControlWidget(QWidget):
         emotion_label.setMinimumWidth(80)
         
         self.emotion_combo = QComboBox()
+        emotions = [
+            ("Neutral", "😐 ニュートラル"),
+            ("Happy", "😊 喜び"),
+            ("Sad", "😢 悲しみ"), 
+            ("Angry", "😠 怒り"),
+            ("Fear", "😰 恐怖"),
+            ("Disgust", "😖 嫌悪"),
+            ("Surprise", "😲 驚き")
+        ]
         
-        # TTSエンジンから感情リストを取得
-        if self.tts_engine and self.tts_engine.is_loaded:
-            available_emotions = self.tts_engine.get_available_styles()
-        else:
-            available_emotions = ["Neutral"]
-        
-        # 感情マッピング（表示用）
-        emotion_display = {
-            "Neutral": "😐 ニュートラル",
-            "Happy": "😊 喜び",
-            "Sad": "😢 悲しみ", 
-            "Angry": "😠 怒り",
-            "Fear": "😰 恐怖",
-            "Disgust": "😖 嫌悪",
-            "Surprise": "😲 驚き"
-        }
-        
-        for emotion in available_emotions:
-            display_name = emotion_display.get(emotion, f"📢 {emotion}")
-            self.emotion_combo.addItem(display_name, emotion)
+        for value, display in emotions:
+            self.emotion_combo.addItem(display, value)
         
         self.emotion_combo.currentTextChanged.connect(self.on_emotion_changed)
         
@@ -107,10 +96,9 @@ class EmotionControlWidget(QWidget):
         intensity_label = QLabel("感情強度:")
         intensity_label.setMinimumWidth(80)
         
-        # スライダー
         self.intensity_slider = QSlider(Qt.Orientation.Horizontal)
-        self.intensity_slider.setRange(0, 200)  # 0.0 ~ 2.0
-        self.intensity_slider.setValue(100)  # 1.0
+        self.intensity_slider.setRange(0, 200)
+        self.intensity_slider.setValue(100)
         self.intensity_slider.setStyleSheet("""
             QSlider::groove:horizontal {
                 border: 1px solid #bbb;
@@ -137,7 +125,6 @@ class EmotionControlWidget(QWidget):
         """)
         self.intensity_slider.valueChanged.connect(self.on_intensity_slider_changed)
         
-        # 数値入力
         self.intensity_spinbox = QDoubleSpinBox()
         self.intensity_spinbox.setRange(0.0, 2.0)
         self.intensity_spinbox.setSingleStep(0.1)
@@ -190,17 +177,14 @@ class EmotionControlWidget(QWidget):
         self.param_spinboxes = {}
         
         for i, (name, key, min_val, max_val, default, desc) in enumerate(params):
-            # ラベル
             label = QLabel(name + ":")
             label.setMinimumWidth(80)
             
-            # スライダー
             slider = QSlider(Qt.Orientation.Horizontal)
             slider.setRange(int(min_val * 100), int(max_val * 100))
             slider.setValue(int(default * 100))
             slider.setStyleSheet(self.intensity_slider.styleSheet())
             
-            # 数値入力
             spinbox = QDoubleSpinBox()
             spinbox.setRange(min_val, max_val)
             spinbox.setSingleStep(0.01)
@@ -208,19 +192,15 @@ class EmotionControlWidget(QWidget):
             spinbox.setDecimals(2)
             spinbox.setFixedWidth(70)
             
-            # 説明
             desc_label = QLabel(desc)
             desc_label.setStyleSheet("color: #666; font-size: 9pt;")
             
-            # イベント接続
             slider.valueChanged.connect(lambda v, k=key: self.on_param_slider_changed(k, v))
             spinbox.valueChanged.connect(lambda v, k=key: self.on_param_spinbox_changed(k, v))
             
-            # 保存
             self.param_sliders[key] = slider
             self.param_spinboxes[key] = spinbox
             
-            # レイアウトに追加
             layout.addWidget(label, i, 0)
             layout.addWidget(slider, i, 1)
             layout.addWidget(spinbox, i, 2)
@@ -250,7 +230,6 @@ class EmotionControlWidget(QWidget):
         layout = QGridLayout(group)
         layout.setSpacing(5)
         
-        # プリセット定義
         presets = [
             ("標準", {
                 'style': 'Neutral', 'style_weight': 1.0, 'length_scale': 0.85,
@@ -298,7 +277,6 @@ class EmotionControlWidget(QWidget):
     
     def on_emotion_changed(self, text):
         """感情変更時の処理"""
-        # コンボボックスのデータから実際の値を取得
         current_data = self.emotion_combo.currentData()
         if current_data:
             self.current_params['style'] = current_data
@@ -328,7 +306,6 @@ class EmotionControlWidget(QWidget):
         """パラメータスライダー変更時"""
         float_value = value / 100.0
         
-        # 対応するスピンボックスを更新
         spinbox = self.param_spinboxes[param_key]
         spinbox.blockSignals(True)
         spinbox.setValue(float_value)
@@ -341,7 +318,6 @@ class EmotionControlWidget(QWidget):
         """パラメータ数値入力変更時"""
         int_value = int(value * 100)
         
-        # 対応するスライダーを更新
         slider = self.param_sliders[param_key]
         slider.blockSignals(True)
         slider.setValue(int_value)
@@ -353,76 +329,120 @@ class EmotionControlWidget(QWidget):
     def apply_preset(self, preset_params):
         """プリセットを適用"""
         self.current_params.update(preset_params)
-        
-        # UI要素を更新（シグナルをブロックして無限ループ防止）
+        self.load_parameters()
+        self.emit_parameters_changed()
+    
+    def load_parameters(self):
+        """現在のパラメータでUIを更新"""
         self.blockSignals(True)
         
         # 感情
         for i in range(self.emotion_combo.count()):
-            if self.emotion_combo.itemData(i) == preset_params['style']:
+            if self.emotion_combo.itemData(i) == self.current_params['style']:
                 self.emotion_combo.setCurrentIndex(i)
                 break
         
         # 感情強度
-        style_weight = preset_params['style_weight']
+        style_weight = self.current_params['style_weight']
         self.intensity_slider.setValue(int(style_weight * 100))
         self.intensity_spinbox.setValue(style_weight)
         
         # その他のパラメータ
-        for key, value in preset_params.items():
+        for key, value in self.current_params.items():
             if key in self.param_sliders:
                 self.param_sliders[key].setValue(int(value * 100))
                 self.param_spinboxes[key].setValue(value)
         
         self.blockSignals(False)
-        
-        # パラメータ変更を通知
-        self.emit_parameters_changed()
     
     def emit_parameters_changed(self):
         """パラメータ変更シグナルを送信"""
-        self.parameters_changed.emit(self.current_params.copy())
+        self.parameters_changed.emit(self.row_id, self.current_params.copy())
     
     def get_current_parameters(self):
         """現在のパラメータを取得"""
         return self.current_params.copy()
+
+class TabbedEmotionControl(QWidget):
+    """タブ式感情制御ウィジェット"""
     
-    def set_parameters(self, params):
-        """パラメータを設定"""
-        self.apply_preset(params)
+    parameters_changed = pyqtSignal(str, dict)  # row_id, parameters
     
-    def set_tts_engine(self, tts_engine):
-        """TTSエンジンを設定し、感情リストを更新"""
-        self.tts_engine = tts_engine
-        self.refresh_emotions()
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.emotion_controls = {}  # row_id -> SingleEmotionControl
+        self.init_ui()
+        
+    def init_ui(self):
+        """UIを初期化"""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        # タブウィジェット（ヘッダーなし）
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                background-color: white;
+            }
+            QTabBar::tab {
+                background-color: #f5f5f5;
+                border: 1px solid #ccc;
+                border-bottom: none;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                padding: 6px 12px;
+                margin-right: 2px;
+            }
+            QTabBar::tab:selected {
+                background-color: white;
+                border-bottom: 1px solid white;
+            }
+            QTabBar::tab:hover:!selected {
+                background-color: #e3f2fd;
+            }
+        """)
+        
+        layout.addWidget(self.tab_widget)
     
-    def refresh_emotions(self):
-        """感情リストを更新"""
-        if not self.tts_engine or not self.tts_engine.is_loaded:
-            return
-        
-        current_emotion = self.emotion_combo.currentData()
-        self.emotion_combo.clear()
-        
-        available_emotions = self.tts_engine.get_available_styles()
-        
-        emotion_display = {
-            "Neutral": "😐 ニュートラル",
-            "Happy": "😊 喜び",
-            "Sad": "😢 悲しみ", 
-            "Angry": "😠 怒り",
-            "Fear": "😰 恐怖",
-            "Disgust": "😖 嫌悪",
-            "Surprise": "😲 驚き"
-        }
-        
-        for emotion in available_emotions:
-            display_name = emotion_display.get(emotion, f"📢 {emotion}")
-            self.emotion_combo.addItem(display_name, emotion)
-        
-        # 前の選択を復元
-        if current_emotion:
-            for i in range(self.emotion_combo.count()):
-                if self.emotion_combo.itemData(i) == current_emotion:
-                    self.emotion_combo.setCurrentIndex(i)
-                    break
+    def add_text_row(self, row_id, row_number, parameters=None):
+        """テキスト行に対応するタブを追加"""
+        if row_id not in self.emotion_controls:
+            control = SingleEmotionControl(row_id, parameters)
+            control.parameters_changed.connect(self.parameters_changed)
+            
+            self.emotion_controls[row_id] = control
+            self.tab_widget.addTab(control, str(row_number))
+    
+    def remove_text_row(self, row_id):
+        """テキスト行に対応するタブを削除"""
+        if row_id in self.emotion_controls:
+            control = self.emotion_controls[row_id]
+            index = self.tab_widget.indexOf(control)
+            if index != -1:
+                self.tab_widget.removeTab(index)
+            del self.emotion_controls[row_id]
+    
+    def update_tab_numbers(self, row_mapping):
+        """タブ番号を更新 {row_id: row_number}"""
+        for row_id, row_number in row_mapping.items():
+            if row_id in self.emotion_controls:
+                control = self.emotion_controls[row_id]
+                index = self.tab_widget.indexOf(control)
+                if index != -1:
+                    self.tab_widget.setTabText(index, str(row_number))
+    
+    def get_parameters(self, row_id):
+        """指定行のパラメータを取得"""
+        if row_id in self.emotion_controls:
+            return self.emotion_controls[row_id].get_current_parameters()
+        return {}
+    
+    def set_current_row(self, row_id):
+        """指定行のタブをアクティブに"""
+        if row_id in self.emotion_controls:
+            control = self.emotion_controls[row_id]
+            index = self.tab_widget.indexOf(control)
+            if index != -1:
+                self.tab_widget.setCurrentIndex(index)
