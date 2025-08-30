@@ -1,4 +1,4 @@
-data_tools/
+tts_studio/
 ├── main.py              # メインエントリーポイント
 ├── model_history.json   # モデルの履歴
 ├── ui/
