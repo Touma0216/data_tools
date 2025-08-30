@@ -4,6 +4,7 @@ tts_studio/
 ├── ui/
 │   ├── __init__.py
 │   ├── main_window.py   # メインウィンドウ
+│   ├── sliding_menu.py   # スライドアニメ
 │   ├── tabbed_emotion_control.py # 感情コントロール
 │   ├── keyboard_shortcuts.py # キーボードショートカット
 │   ├── multi_text.py # 複数テキスト対応

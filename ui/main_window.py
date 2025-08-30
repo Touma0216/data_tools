@@ -11,6 +11,7 @@ from .model_loader import ModelLoaderDialog
 from .tabbed_emotion_control import TabbedEmotionControl
 from .multi_text import MultiTextWidget
 from .keyboard_shortcuts import KeyboardShortcutManager
+from .sliding_menu import SlidingMenuWidget
 from core.tts_engine import TTSEngine
 from core.model_manager import ModelManager
 
@@ -20,6 +21,11 @@ class TTSStudioMainWindow(QMainWindow):
         self.tts_engine = TTSEngine()
         self.model_manager = ModelManager()
         self.init_ui()
+        
+        # スライド式メニューを作成
+        self.sliding_menu = SlidingMenuWidget(self)
+        self.sliding_menu.load_model_clicked.connect(self.open_model_loader)
+        self.sliding_menu.load_from_history_clicked.connect(self.show_model_history_dialog)
         
         # キーボードショートカット設定
         self.keyboard_shortcuts = KeyboardShortcutManager(self)
@@ -152,25 +158,22 @@ class TTSStudioMainWindow(QMainWindow):
             QMenuBar::item { background-color: transparent; padding: 6px 12px; margin: 0px 2px; border-radius: 4px; }
             QMenuBar::item:selected { background-color: #e9ecef; }
             QMenuBar::item:pressed { background-color: #dee2e6; }
-            QMenu { background-color: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 4px 0px; }
-            QMenu::item { padding: 8px 20px; margin: 2px 4px; border-radius: 4px; }
-            QMenu::item:selected { background-color: #e3f2fd; color: #1976d2; }
-            QMenu::separator { height: 1px; background-color: #dee2e6; margin: 4px 8px; }
         """)
 
-        file_menu = menubar.addMenu("ファイル(F)")
+        # ファイルメニューをアクションとして追加（サブメニューなし）
+        file_action = menubar.addAction("ファイル(F)")
+        file_action.triggered.connect(self.toggle_file_menu)
 
-        load_model_action = QAction(self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon), "モデルを読み込み", self)
-        load_model_action.setStatusTip("Style-Bert-VITS2モデルを読み込む")
-        load_model_action.triggered.connect(self.open_model_loader)
-        file_menu.addAction(load_model_action)
-
-        file_menu.addSeparator()
-
-        load_from_history_action = QAction(self.style().standardIcon(QStyle.StandardPixmap.SP_DriveFDIcon), "モデル履歴から読み込み", self)
-        load_from_history_action.setStatusTip("過去に読み込んだモデルから選択")
-        load_from_history_action.triggered.connect(self.show_model_history_dialog)
-        file_menu.addAction(load_from_history_action)
+    def toggle_file_menu(self):
+        """ファイルメニューの表示/非表示を切り替え"""
+        self.sliding_menu.toggle_menu()
+    
+    def mousePressEvent(self, event):
+        """マウスクリック時の処理（メニュー外クリックでメニューを閉じる）"""
+        # スライドメニューの外側をクリックした場合、メニューを閉じる
+        if self.sliding_menu.is_visible and not self.sliding_menu.geometry().contains(event.pos()):
+            self.sliding_menu.hide_menu()
+        super().mousePressEvent(event)
 
     # ---------- 履歴ダイアログ ----------
     def open_model_loader(self):

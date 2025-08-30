@@ -46,11 +46,7 @@ class KeyboardShortcutManager(QObject):
     
     def open_file_menu(self):
         """ファイルメニューを開く"""
-        file_menu = self.main_window.menuBar().actions()[0].menu()
-        if file_menu:
-            file_menu.exec(self.main_window.menuBar().mapToGlobal(
-                self.main_window.menuBar().actionGeometry(self.main_window.menuBar().actions()[0]).bottomLeft()
-            ))
+        self.main_window.toggle_file_menu()
     
     def play_current_row(self):
         """現在フォーカス中の行を再生"""

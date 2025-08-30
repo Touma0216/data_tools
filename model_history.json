@@ -7,14 +7,6 @@
       "model_path": "C:\\Users\\masa2\\Downloads\\copy_honoka\\honoka_model_e50_s2050.safetensors",
       "config_path": "C:\\Users\\masa2\\Downloads\\copy_honoka\\config.json",
       "style_path": "C:\\Users\\masa2\\Downloads\\copy_honoka\\style_vectors.npy"
-    },
-    {
-      "id": "36bb6e1515db",
-      "name": "copy_honoka",
-      "note": "",
-      "model_path": "C:\\Users\\masa2\\Downloads\\copy_honoka\\honoka_model_e30_s300.safetensors",
-      "config_path": "C:\\Users\\masa2\\Downloads\\copy_honoka\\config.json",
-      "style_path": "C:\\Users\\masa2\\Downloads\\copy_honoka\\style_vectors.npy"
     }
   ]
 }
