@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, 
-                            QPushButton, QLabel, QFrame, QScrollArea, QComboBox, QSlider)
+                            QPushButton, QLabel, QFrame, QScrollArea)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 import uuid
@@ -65,15 +65,6 @@ class TextRowWidget(QWidget):
                 font-size: 12px;
             }
         """)
-        
-        # 感情選択（コンパクト版） - 削除
-        # self.emotion_combo = ...
-        
-        # クイックパラメータ（ピッチのみ） - 削除
-        # self.pitch_slider = ...
-        
-        # 詳細設定ボタン - 削除
-        # self.detail_btn = ...
         
         # 再生ボタン
         self.play_btn = QPushButton("▶")
@@ -141,17 +132,8 @@ class TextRowWidget(QWidget):
     
     def set_parameters(self, parameters):
         """パラメータを設定"""
+        # 削除済みのUI要素への参照を除去
         self.parameters.update(parameters)
-        
-        # UI更新
-        emotion = parameters.get('style', 'Neutral')
-        for i in range(self.emotion_combo.count()):
-            if self.emotion_combo.itemData(i) == emotion:
-                self.emotion_combo.setCurrentIndex(i)
-                break
-        
-        pitch = parameters.get('pitch_scale', 1.0)
-        self.pitch_slider.setValue(int(pitch * 100))
     
     def update_row_number(self, number):
         """行番号を更新"""
@@ -301,8 +283,9 @@ class MultiTextWidget(QWidget):
         self.row_numbers_updated.emit(row_mapping)
     
     def on_row_parameters_changed(self, row_id, parameters):
-        """行のパラメータが変更された"""
-        
+        """行のパラメータが変更された（現在は未使用）"""
+        pass
+    
     def play_single_row(self, row_id):
         """単一行を再生"""
         if row_id in self.text_rows:
@@ -312,12 +295,6 @@ class MultiTextWidget(QWidget):
             
             if text:
                 self.play_single_requested.emit(row_id, text, parameters)
-            else:
-                pass
-
-    def play_all_rows(self):
-        """全行を再生（削除 - メイン画面のボタンを使用）"""
-        pass
     
     def get_all_texts_and_parameters(self):
         """全てのテキストとパラメータを取得"""

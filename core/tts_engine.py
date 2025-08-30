@@ -3,6 +3,17 @@ import numpy as np
 from pathlib import Path
 import traceback
 import inspect
+import logging
+
+# Style-Bert-VITS2のログを無効化
+logging.getLogger("style_bert_vits2").setLevel(logging.ERROR)
+logging.getLogger("bert_models").setLevel(logging.ERROR)  
+logging.getLogger("tts_model").setLevel(logging.ERROR)
+logging.getLogger("infer").setLevel(logging.ERROR)
+
+# 他の一般的なログも必要に応じて無効化
+logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("torch").setLevel(logging.ERROR)
 
 class TTSEngine:
     def __init__(self):
@@ -22,7 +33,6 @@ class TTSEngine:
     def load_model(self, model_path, config_path, style_path):
         """モデルを読み込む"""
         try:
-
             # BERTモデルの読み込み
             from style_bert_vits2.nlp import bert_models
             from style_bert_vits2.constants import Languages
@@ -99,14 +109,12 @@ class TTSEngine:
             raise ValueError("テキストが空です")
             
         try:
-            
             # パラメータを準備
             synth_params = self.default_params.copy()
             synth_params.update(params)
                         
             # モデルの infer メソッドのシグネチャを確認して安全に呼び出し
             kwargs = self._build_infer_kwargs(text, synth_params)
-            
             
             # 音声合成実行
             sr, audio = self.model.infer(**kwargs)
@@ -115,11 +123,10 @@ class TTSEngine:
             if audio is None or len(audio) == 0:
                 raise RuntimeError("音声データが生成されませんでした")
                 
-            
             return sr, audio
             
         except Exception as e:
-            pass
+            raise e
     
     def _build_infer_kwargs(self, text, params):
         """infer() メソッドに渡す引数を安全に構築"""
@@ -129,7 +136,6 @@ class TTSEngine:
         # メソッドシグネチャを取得
         sig = inspect.signature(self.model.infer)
         method_params = sig.parameters
-        
         
         # テキスト引数
         kwargs = {}
@@ -148,7 +154,6 @@ class TTSEngine:
             kwargs["style_weight"] = params.get('style_weight', 1.0)
         elif "emotion_weight" in method_params:
             kwargs["emotion_weight"] = params.get('style_weight', 1.0)
-
 
         # 長さ系（複数のパラメータ名をチェック）
         length_scale = params.get('length_scale', 0.85)

@@ -1,5 +1,13 @@
 import sys
+import logging
+import warnings
 from PyQt6.QtWidgets import QApplication
+
+# 全てのログを無効化（最強設定）
+logging.disable(logging.CRITICAL)
+
+# 警告も無効化
+warnings.filterwarnings("ignore")
 
 # 新しいモジュールのインポート
 from ui.main_window import TTSStudioMainWindow

@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                            QPushButton, QLabel, QFileDialog, QStyle, QFrame, QApplication)
+                            QPushButton, QLabel, QFileDialog, QStyle, QFrame, QApplication, QMessageBox)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QAction
 
@@ -19,7 +19,6 @@ class TTSStudioMainWindow(QMainWindow):
         self.tts_engine = TTSEngine()
         self.model_manager = ModelManager()
         self.init_ui()
-
         self.load_last_model()
 
     def init_ui(self):
@@ -141,7 +140,6 @@ class TTSStudioMainWindow(QMainWindow):
             QPushButton:disabled { background-color: #f0f0f0; color: #aaaaaa; }
         """
 
-
     def create_menu_bar(self):
         menubar = self.menuBar()
         menubar.setStyleSheet("""
@@ -207,6 +205,41 @@ class TTSStudioMainWindow(QMainWindow):
         lay.addWidget(widget)
         dlg.exec()
 
+    # ---------- モデル読み込み ----------
+    def load_model(self, paths):
+        """モデルを読み込む"""
+        try:
+            success = self.tts_engine.load_model(
+                paths["model_path"], 
+                paths["config_path"], 
+                paths["style_path"]
+            )
+            
+            if success:
+                # 履歴に追加
+                self.model_manager.add_model(
+                    paths["model_path"], 
+                    paths["config_path"], 
+                    paths["style_path"]
+                )
+                
+                # ボタンを有効化
+                self.sequential_play_btn.setEnabled(True)
+                self.save_individual_btn.setEnabled(True)
+                self.save_continuous_btn.setEnabled(True)
+                
+                # ウィンドウタイトル更新
+                model_name = Path(paths["model_path"]).parent.name
+                self.setWindowTitle(f"TTSスタジオ - {model_name}")
+                
+                QMessageBox.information(self, "成功", "モデルを読み込みました。")
+                
+            else:
+                QMessageBox.critical(self, "エラー", "モデルの読み込みに失敗しました。")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "エラー", f"モデル読み込み中にエラーが発生しました: {str(e)}")
+
     # ---------- TTS / そのほか（既存） ----------
     def on_text_row_added(self, row_id, row_number):
         self.tabbed_emotion_control.add_text_row(row_id, row_number)
@@ -216,6 +249,11 @@ class TTSStudioMainWindow(QMainWindow):
 
     def on_row_numbers_updated(self, row_mapping):
         self.tabbed_emotion_control.update_tab_numbers(row_mapping)
+
+    def on_parameters_changed(self, row_id, parameters):
+        """パラメータ変更時の処理（必要に応じて実装）"""
+        # 現在は何もしないが、将来的にリアルタイムプレビューなどに使用可能
+        pass
 
     def load_last_model(self):
         models = self.model_manager.get_all_models()
@@ -236,11 +274,14 @@ class TTSStudioMainWindow(QMainWindow):
             self.sequential_play_btn.setEnabled(True)
             self.save_individual_btn.setEnabled(True)
             self.save_continuous_btn.setEnabled(True)
-        else:
-            pass
+            
+            # ウィンドウタイトル更新
+            model_name = Path(paths["model_path"]).parent.name
+            self.setWindowTitle(f"TTSスタジオ - {model_name}")
 
     def play_single_text(self, row_id, text, parameters):
         if not self.tts_engine.is_loaded:
+            QMessageBox.warning(self, "エラー", "モデルが読み込まれていません。")
             return
         tab_parameters = self.tabbed_emotion_control.get_parameters(row_id) or parameters
         try:
@@ -248,22 +289,38 @@ class TTSStudioMainWindow(QMainWindow):
             import sounddevice as sd
             sd.play(audio, sr, blocking=False)
         except Exception as e:
-            pass
+            QMessageBox.critical(self, "エラー", f"音声合成に失敗しました: {str(e)}")
+
+    def trim_silence(self, audio, sample_rate, threshold=0.01):
+        """音声の末尾無音部分を削除"""
+        import numpy as np
+        
+        # 音声の絶対値を計算
+        abs_audio = np.abs(audio)
+        
+        # 閾値以上の値がある最後の位置を見つける
+        non_silent = np.where(abs_audio > threshold)[0]
+        
+        if len(non_silent) > 0:
+            # 末尾の無音を削除（少し余裕を持たせる）
+            end_idx = min(len(audio), non_silent[-1] + int(sample_rate * 0.1))  # 0.1秒の余裕
+            return audio[:end_idx]
+        else:
+            return audio
 
     def play_sequential(self):
         """連続して再生（1→2→3の順で、各タブのパラメータ使用）"""
         if not self.tts_engine.is_loaded:
+            QMessageBox.warning(self, "エラー", "モデルが読み込まれていません。")
             return
         
         # 全テキストを取得
         texts_data = self.multi_text.get_all_texts_and_parameters()
         if not texts_data:
-            pass
+            QMessageBox.information(self, "情報", "再生するテキストがありません。")
             return
         
         try:
-            pass
-
             # ボタンを一時無効化
             self.sequential_play_btn.setEnabled(False)
             self.sequential_play_btn.setText("再生中...")
@@ -330,15 +387,17 @@ class TTSStudioMainWindow(QMainWindow):
         except Exception as e:
             self.sequential_play_btn.setEnabled(True)
             self.sequential_play_btn.setText("連続して再生")
+            QMessageBox.critical(self, "エラー", f"連続再生に失敗しました: {str(e)}")
     
     def save_individual(self):
         """個別保存（フォルダ内に個別ファイル）"""
         if not self.tts_engine.is_loaded:
+            QMessageBox.warning(self, "エラー", "モデルが読み込まれていません。")
             return
         
         texts_data = self.multi_text.get_all_texts_and_parameters()
         if not texts_data:
-            pass
+            QMessageBox.information(self, "情報", "保存するテキストがありません。")
             return
         
         try:
@@ -379,21 +438,27 @@ class TTSStudioMainWindow(QMainWindow):
                     file_path = os.path.join(folder_path, filename)
                     
                     sf.write(file_path, audio, sr)
+                
                 # ボタンを元に戻す
                 self.save_individual_btn.setEnabled(True)
                 self.save_individual_btn.setText("個別保存")
                 
+                QMessageBox.information(self, "完了", f"個別ファイルを保存しました。\n保存先: {folder_path}")
+                
         except Exception as e:
             self.save_individual_btn.setEnabled(True)
             self.save_individual_btn.setText("個別保存")
+            QMessageBox.critical(self, "エラー", f"個別保存に失敗しました: {str(e)}")
     
     def save_continuous(self):
         """連続保存（1つのWAVファイルに統合）"""
         if not self.tts_engine.is_loaded:
+            QMessageBox.warning(self, "エラー", "モデルが読み込まれていません。")
             return
         
         texts_data = self.multi_text.get_all_texts_and_parameters()
         if not texts_data:
+            QMessageBox.information(self, "情報", "保存するテキストがありません。")
             return
         
         try:
@@ -468,6 +533,9 @@ class TTSStudioMainWindow(QMainWindow):
                 self.save_continuous_btn.setEnabled(True)
                 self.save_continuous_btn.setText("連続保存")
                 
+                QMessageBox.information(self, "完了", f"連続音声ファイルを保存しました。\n保存先: {file_path}")
+                
         except Exception as e:
             self.save_continuous_btn.setEnabled(True)
             self.save_continuous_btn.setText("連続保存")
+            QMessageBox.critical(self, "エラー", f"連続保存に失敗しました: {str(e)}")
