@@ -1,19 +1,22 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget,
                             QListWidgetItem, QPushButton, QLabel, QLineEdit,
-                            QDialog, QMessageBox)
-from PyQt6.QtCore import Qt, pyqtSignal
+                            QMessageBox)
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 
 class ModelHistoryItem(QWidget):
-    """履歴アイテムのカスタムウィジェット（名前＋メモ、✎と×、読み込み）"""
-    load_requested = pyqtSignal(str)    # model_id
-    edit_requested = pyqtSignal(str)    # model_id
-    delete_requested = pyqtSignal(str)  # model_id
+    """名前＋メモ、✎改名・×削除・読み込み。黒縁は常時。"""
+    load_requested = pyqtSignal(str)       # model_id
+    edit_requested = pyqtSignal(str)       # model_id
+    delete_requested = pyqtSignal(str)     # model_id
     note_changed   = pyqtSignal(str, str)  # (model_id, note)
 
     def __init__(self, model_data, parent=None):
         super().__init__(parent)
         self.model_data = model_data
+        self._note_timer = QTimer(self)
+        self._note_timer.setSingleShot(True)
+        self._note_timer.setInterval(400)  # デバウンス 0.4s
         self.init_ui()
 
     def init_ui(self):
@@ -21,14 +24,13 @@ class ModelHistoryItem(QWidget):
         root.setContentsMargins(10, 10, 10, 10)
         root.setSpacing(8)
 
-        # 上段：名前＋アクション（✎, ×, 読み込み）
+        # 上段：名前＋アクション
         top = QHBoxLayout()
         top.setSpacing(8)
 
         self.name_label = QLabel(self.model_data['name'])
         self.name_label.setFont(QFont("", 10, QFont.Weight.Bold))
         self.name_label.setStyleSheet("color:#333;")
-
         top.addWidget(self.name_label, 1)
 
         edit_btn = QPushButton("✎")
@@ -69,7 +71,7 @@ class ModelHistoryItem(QWidget):
         load_btn.clicked.connect(lambda: self.load_requested.emit(self.model_data['id']))
         top.addWidget(load_btn)
 
-        # 下段：メモ（単行／任意）
+        # 下段：メモ
         self.note_edit = QLineEdit(self.model_data.get('note', ""))
         self.note_edit.setPlaceholderText("このモデルのメモ（任意）")
         self.note_edit.setStyleSheet("""
@@ -77,22 +79,24 @@ class ModelHistoryItem(QWidget):
                 padding:6px 8px; background:#fff;
                 border:1px solid #cccccc; border-radius:4px; color:#444;
             }
-            QLineEdit:focus {
-                border:1px solid #888888;
-            }
+            QLineEdit:focus { border:1px solid #888888; }
         """)
-        self.note_edit.textEdited.connect(
-            lambda txt: self.note_changed.emit(self.model_data['id'], txt)
+        self.note_edit.textEdited.connect(self._on_note_edited)
+        self._note_timer.timeout.connect(
+            lambda: self.note_changed.emit(self.model_data['id'], self.note_edit.text())
         )
 
         root.addLayout(top)
         root.addWidget(self.note_edit)
 
-        # 黒縁（常時）をこのアイテム自身につける
+        # アイテム自体の黒縁（常時）
         self.setStyleSheet("background:white; border:1px solid #cccccc; border-radius:6px;")
 
+    def _on_note_edited(self, _):
+        self._note_timer.start()
+
 class ModelHistoryWidget(QWidget):
-    """モデル履歴表示ウィジェット（シンプル版）"""
+    """モデル履歴表示（シンプル）"""
     model_selected = pyqtSignal(dict)  # 選択されたモデルデータ
 
     def __init__(self, model_manager, parent=None):
@@ -112,22 +116,15 @@ class ModelHistoryWidget(QWidget):
 
         self.list = QListWidget()
         self.list.setStyleSheet("""
-            QListWidget {
-                border: 1px solid #ddd; border-radius: 6px; background: #fafafa;
-            }
+            QListWidget { border: 1px solid #ddd; border-radius: 6px; background: #fafafa; }
             QListWidget::item { margin: 8px; }
-            /* 選択時は背景だけ淡く。黒縁はアイテム側に常時付与 */
-            QListWidget::item:selected { background: #e3f2fd; }
-            /* 点線フォーカスは消す */
-            QListWidget::item:focus { outline: none; }
+            QListWidget::item:selected { background: #e3f2fd; }  /* 枠いじらない */
+            QListWidget::item:focus { outline: none; }            /* 点線殺す */
         """)
 
         clear = QPushButton("履歴をクリア")
         clear.setStyleSheet("""
-            QPushButton {
-                color:#666; border:1px solid #ddd; border-radius:6px;
-                padding:4px 10px; font-size:9pt;
-            }
+            QPushButton { color:#666; border:1px solid #ddd; border-radius:6px; padding:4px 10px; font-size:9pt; }
             QPushButton:hover { background:#f5f5f5; }
         """)
         clear.clicked.connect(self.clear_history)
@@ -196,5 +193,5 @@ class ModelHistoryWidget(QWidget):
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.model_manager.models = []
-            self.model_manager.save_history()
+            self.model_manager.save_history(quiet=True)
             self.refresh_list()

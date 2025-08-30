@@ -1,13 +1,11 @@
-import sys
 import os
 from pathlib import Path
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
-                            QHBoxLayout, QPushButton, QLabel, QFileDialog, QStyle, QFrame)
+from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+                            QPushButton, QLabel, QFileDialog, QStyle, QFrame, QApplication)
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QAction, QIcon
+from PyQt6.QtGui import QFont, QAction
 
 # 自作モジュール
-# 注: 相対パスでのインポートに変更
 from .model_history import ModelHistoryWidget
 from .model_loader import ModelLoaderDialog
 from .tabbed_emotion_control import TabbedEmotionControl
@@ -15,291 +13,145 @@ from .multi_text import MultiTextWidget
 from core.tts_engine import TTSEngine
 from core.model_manager import ModelManager
 
-
 class TTSStudioMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        
-        # TTSエンジン初期化
         self.tts_engine = TTSEngine()
-        
-        # モデル管理初期化
         self.model_manager = ModelManager()
-        
         self.init_ui()
-        
+
     def init_ui(self):
-        """UIの初期化"""
-        # ウィンドウ設定
         self.setWindowTitle("TTSスタジオ - ほのかちゃん")
         self.setGeometry(100, 100, 1200, 800)
-        
-        # メニューバーを作成
         self.create_menu_bar()
-        
-        # 中央ウィジェット
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        
-        # メインレイアウト
-        main_layout = QVBoxLayout(central_widget)
-        main_layout.setSpacing(10)
-        main_layout.setContentsMargins(15, 15, 15, 15)
-        
-        # メインコンテンツエリア
-        content_layout = QHBoxLayout()
-        
-        # 左側: テキスト入力とコントロール
-        left_layout = QVBoxLayout()
-        
-        # 複数テキスト入力エリア
+
+        central = QWidget()
+        self.setCentralWidget(central)
+        main = QVBoxLayout(central)
+        main.setSpacing(10)
+        main.setContentsMargins(15, 15, 15, 15)
+
+        content = QHBoxLayout()
+
+        # 左ペイン
+        left = QVBoxLayout()
         self.multi_text = MultiTextWidget()
         self.multi_text.play_single_requested.connect(self.play_single_text)
         self.multi_text.row_added.connect(self.on_text_row_added)
         self.multi_text.row_removed.connect(self.on_text_row_removed)
         self.multi_text.row_numbers_updated.connect(self.on_row_numbers_updated)
-        
-        # パラメータエリア
+
         params_label = QLabel("音声パラメータ:")
         params_label.setFont(QFont("", 10, QFont.Weight.Bold))
 
-        # UIの区切り線を追加
-        section_divider = QFrame()
-        section_divider.setFrameShape(QFrame.Shape.HLine)
-        section_divider.setFrameShadow(QFrame.Shadow.Sunken)
-        section_divider.setStyleSheet("color: #dee2e6;")
-        
-        # タブ式感情制御ウィジェット
+        divider = QFrame()
+        divider.setFrameShape(QFrame.Shape.HLine)
+        divider.setFrameShadow(QFrame.Shadow.Sunken)
+        divider.setStyleSheet("color: #dee2e6;")
+
         self.tabbed_emotion_control = TabbedEmotionControl()
         self.tabbed_emotion_control.parameters_changed.connect(self.on_parameters_changed)
-        
-        # 初期タブを作成（MultiTextWidgetの初期行 "initial" に対応）
         self.tabbed_emotion_control.add_text_row("initial", 1)
-        
-        # 制御ボタン（3つ）
-        controls_layout = QHBoxLayout()
-        controls_layout.addStretch()
-        
-        # 連続再生ボタン
+
+        controls = QHBoxLayout()
+        controls.addStretch()
+
         self.sequential_play_btn = QPushButton("連続して再生")
         self.sequential_play_btn.setMinimumHeight(35)
         self.sequential_play_btn.setEnabled(False)
-        self.sequential_play_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #f0f0f0; /* 薄いグレー */
-                color: #333333; /* 濃いグレーの文字 */
-                border: 1px solid #cccccc;
-                border-radius: 4px;
-                font-size: 13px;
-                font-weight: bold;
-                padding: 0 16px;
-            }
-            QPushButton:hover:enabled {
-                background-color: #e0e0e0;
-            }
-            QPushButton:pressed:enabled {
-                background-color: #d0d0d0;
-            }
-            QPushButton:disabled {
-                background-color: #f8f8f8;
-                color: #aaaaaa;
-                border: 1px solid #e5e5e5;
-            }
-        """)
+        self.sequential_play_btn.setStyleSheet(self._gray_btn_css())
         self.sequential_play_btn.clicked.connect(self.play_sequential)
-        
-        # 個別保存ボタン
+
         self.save_individual_btn = QPushButton("個別保存")
         self.save_individual_btn.setMinimumHeight(35)
         self.save_individual_btn.setEnabled(False)
-        self.save_individual_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #f0f0f0;
-                color: #333333;
-                border: 1px solid #cccccc;
-                border-radius: 4px;
-                font-size: 13px;
-                font-weight: bold;
-                padding: 0 16px;
-            }
-            QPushButton:hover:enabled {
-                background-color: #e0e0e0;
-            }
-            QPushButton:pressed:enabled {
-                background-color: #d0d0d0;
-            }
-            QPushButton:disabled {
-                background-color: #f8f8f8;
-                color: #aaaaaa;
-                border: 1px solid #e5e5e5;
-            }
-        """)
+        self.save_individual_btn.setStyleSheet(self._gray_btn_css())
         self.save_individual_btn.clicked.connect(self.save_individual)
-        
-        # 連続保存ボタン
+
         self.save_continuous_btn = QPushButton("連続保存")
         self.save_continuous_btn.setMinimumHeight(35)
         self.save_continuous_btn.setEnabled(False)
-        self.save_continuous_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #f0f0f0;
-                color: #333333;
-                border: 1px solid #cccccc;
-                border-radius: 4px;
-                font-size: 13px;
-                font-weight: bold;
-                padding: 0 16px;
-            }
-            QPushButton:hover:enabled {
-                background-color: #e0e0e0;
-            }
-            QPushButton:pressed:enabled {
-                background-color: #d0d0d0;
-            }
-            QPushButton:disabled {
-                background-color: #f8f8f8;
-                color: #aaaaaa;
-                border: 1px solid #e5e5e5;
-            }
-        """)
+        self.save_continuous_btn.setStyleSheet(self._gray_btn_css())
         self.save_continuous_btn.clicked.connect(self.save_continuous)
-        
-        controls_layout.addWidget(self.sequential_play_btn)
-        controls_layout.addWidget(self.save_individual_btn)
-        controls_layout.addWidget(self.save_continuous_btn)
-        
-        # 左側レイアウト組み立て
-        left_layout.addWidget(self.multi_text, 1)
-        left_layout.addWidget(params_label)
-        left_layout.addWidget(section_divider)
-        left_layout.addWidget(self.tabbed_emotion_control, 1)
-        left_layout.addLayout(controls_layout)
-        
-        # 右側: Live2D表示エリア
+
+        controls.addWidget(self.sequential_play_btn)
+        controls.addWidget(self.save_individual_btn)
+        controls.addWidget(self.save_continuous_btn)
+
+        left.addWidget(self.multi_text, 1)
+        left.addWidget(params_label)
+        left.addWidget(divider)
+        left.addWidget(self.tabbed_emotion_control, 1)
+        left.addLayout(controls)
+
+        # 右ペイン（ダミー）
         self.live2d_widget = QWidget()
         self.live2d_widget.setMaximumWidth(300)
         self.live2d_widget.setMinimumWidth(250)
         self.live2d_widget.setStyleSheet("""
-            QWidget {
-                background-color: #ffffff;
-                border: 1px solid #dee2e6;
-                border-radius: 4px;
-            }
+            QWidget { background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; }
         """)
-        
         live2d_layout = QVBoxLayout(self.live2d_widget)
         live2d_label = QLabel("Live2D\nリップシンクエリア")
         live2d_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         live2d_label.setStyleSheet("color: #666; font-size: 14px; border: none;")
         live2d_layout.addWidget(live2d_label)
-        
-        # メインコンテンツレイアウト
-        content_layout.addLayout(left_layout, 1)
-        content_layout.addWidget(self.live2d_widget, 0)
-        
-        # レイアウトに追加
-        main_layout.addLayout(content_layout)
+
+        content.addLayout(left, 1)
+        content.addWidget(self.live2d_widget, 0)
+        main.addLayout(content)
+
+    def _gray_btn_css(self) -> str:
+        return """
+            QPushButton {
+                background-color: #f0f0f0; color: #333333;
+                border: 1px solid #cccccc; border-radius: 4px;
+                font-size: 13px; font-weight: bold; padding: 0 16px;
+            }
+            QPushButton:hover:enabled { background-color: #e0e0e0; }
+            QPushButton:pressed:enabled { background-color: #d0d0d0; }
+            QPushButton:disabled {
+                background-color: #f8f8f8; color: #aaaaaa; border: 1px solid #e5e5e5;
+            }
+        """
 
     def create_menu_bar(self):
-        """メニューバーを作成"""
         menubar = self.menuBar()
         menubar.setStyleSheet("""
-            QMenuBar {
-                background-color: #f8f9fa;
-                color: #333;
-                border-bottom: 1px solid #dee2e6;
-                padding: 4px;
-            }
-            QMenuBar::item {
-                background-color: transparent;
-                padding: 6px 12px;
-                margin: 0px 2px;
-                border-radius: 4px;
-            }
-            QMenuBar::item:selected {
-                background-color: #e9ecef;
-            }
-            QMenuBar::item:pressed {
-                background-color: #dee2e6;
-            }
-            QMenu {
-                background-color: white;
-                border: 1px solid #dee2e6;
-                border-radius: 6px;
-                padding: 4px 0px;
-            }
-            QMenu::item {
-                padding: 8px 20px;
-                margin: 2px 4px;
-                border-radius: 4px;
-            }
-            QMenu::item:selected {
-                background-color: #e3f2fd;
-                color: #1976d2;
-            }
-            QMenu::separator {
-                height: 1px;
-                background-color: #dee2e6;
-                margin: 4px 8px;
-            }
+            QMenuBar { background-color: #f8f9fa; color: #333; border-bottom: 1px solid #dee2e6; padding: 4px; }
+            QMenuBar::item { background-color: transparent; padding: 6px 12px; margin: 0px 2px; border-radius: 4px; }
+            QMenuBar::item:selected { background-color: #e9ecef; }
+            QMenuBar::item:pressed { background-color: #dee2e6; }
+            QMenu { background-color: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 4px 0px; }
+            QMenu::item { padding: 8px 20px; margin: 2px 4px; border-radius: 4px; }
+            QMenu::item:selected { background-color: #e3f2fd; color: #1976d2; }
+            QMenu::separator { height: 1px; background-color: #dee2e6; margin: 4px 8px; }
         """)
-        
-        # ファイルメニュー
+
         file_menu = menubar.addMenu("ファイル")
-        
-        # モデル読み込みアクション
+
         load_model_action = QAction(self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon), "モデルを読み込み", self)
         load_model_action.setStatusTip("Style-Bert-VITS2モデルを読み込む")
         load_model_action.triggered.connect(self.open_model_loader)
         file_menu.addAction(load_model_action)
-        
-        # 区切り線
+
         file_menu.addSeparator()
-        
-        # モデル履歴から読み込みアクション
+
         load_from_history_action = QAction(self.style().standardIcon(QStyle.StandardPixmap.SP_DriveFDIcon), "モデル履歴から読み込み", self)
         load_from_history_action.setStatusTip("過去に読み込んだモデルから選択")
         load_from_history_action.triggered.connect(self.show_model_history_dialog)
         file_menu.addAction(load_from_history_action)
-    
-    def trim_silence(self, audio, sample_rate, threshold=0.03):
-        """音声データの末尾無音を削除"""
-        import numpy as np
-        
-        # 末尾から逆向きに検索して、閾値以上の音がある位置を見つける
-        for i in range(len(audio) - 1, -1, -1):
-            if abs(audio[i]) > threshold:
-                # 0.02秒のバッファを残して切る
-                buffer_samples = int(sample_rate * 0.02)
-                end_pos = min(i + buffer_samples, len(audio))
-                return audio[:end_pos]
-        return audio
-    
-    def on_text_row_added(self, row_id, row_number):
-        """テキスト行が追加された時"""
-        self.tabbed_emotion_control.add_text_row(row_id, row_number)
-    
-    def on_text_row_removed(self, row_id):
-        """テキスト行が削除された時"""
-        self.tabbed_emotion_control.remove_text_row(row_id)
-    
-    def on_row_numbers_updated(self, row_mapping):
-        """行番号が更新された時"""
-        self.tabbed_emotion_control.update_tab_numbers(row_mapping)
-        
+
+    # ---------- 履歴ダイアログ ----------
     def open_model_loader(self):
-        """モデル読み込みダイアログを開く"""
         dialog = ModelLoaderDialog(self)
         dialog.model_loaded.connect(self.load_model)
         dialog.exec()
-        
-    def show_model_history_dialog(self):
-        """モデル履歴選択ダイアログ（✎改名・×削除付き）"""
-        from PyQt6.QtWidgets import QDialog, QVBoxLayout
 
-        # 履歴が空なら案内
+    def show_model_history_dialog(self):
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QMessageBox
+
         if not self.model_manager.get_all_models():
-            from PyQt6.QtWidgets import QMessageBox
             QMessageBox.information(self, "履歴なし", "モデル履歴がありません。")
             return
 
@@ -307,18 +159,13 @@ class TTSStudioMainWindow(QMainWindow):
         dlg.setWindowTitle("モデル履歴から選択")
         dlg.setModal(True)
         dlg.resize(560, 420)
-        dlg.setStyleSheet("""
-            QDialog { background:#f8f9fa; }
-        """)
+        dlg.setStyleSheet("QDialog { background:#f8f9fa; }")
 
         lay = QVBoxLayout(dlg)
         widget = ModelHistoryWidget(self.model_manager, dlg)
 
-        # 履歴ウィジェットから「読み込み」が飛んできたら実ロード
         def _on_selected(model_data):
-            # ファイル存在チェック（保険）
             if not self.model_manager.validate_model_files(model_data):
-                from PyQt6.QtWidgets import QMessageBox
                 QMessageBox.warning(dlg, "エラー", "モデルファイルが見つかりません。")
                 return
             paths = {
@@ -327,99 +174,50 @@ class TTSStudioMainWindow(QMainWindow):
                 'style_path': model_data['style_path'],
             }
             dlg.accept()
-            self.load_model(paths)                  # 実ロード
-            self.model_manager.update_last_used(model_data['id'])  # 使用日時更新
+            self.load_model(paths)
+            self.model_manager.update_last_used(model_data['id'])
 
         widget.model_selected.connect(_on_selected)
         lay.addWidget(widget)
         dlg.exec()
 
-    
-    def load_selected_model(self, dialog, history_list):
-        """選択されたモデルを読み込み"""
-        current_item = history_list.currentItem()
-        if not current_item:
-            return
-        
-        model_data = current_item.data(Qt.ItemDataRole.UserRole)
-        
-        # ファイル存在チェック
-        if not self.model_manager.validate_model_files(model_data):
-            from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.warning(dialog, "エラー", "モデルファイルが見つかりません。")
-            return
-        
-        # モデル読み込み
-        paths = {
-            'model_path': model_data['model_path'],
-            'config_path': model_data['config_path'],
-            'style_path': model_data['style_path']
-        }
-        
-        dialog.accept()
-        self.load_model(paths)
-        
-        # 履歴を更新（最終使用日時）
-        self.model_manager.update_last_used(model_data['id'])
-        
+    # ---------- TTS / そのほか（既存） ----------
+    def on_text_row_added(self, row_id, row_number):
+        self.tabbed_emotion_control.add_text_row(row_id, row_number)
+
+    def on_text_row_removed(self, row_id):
+        self.tabbed_emotion_control.remove_text_row(row_id)
+
+    def on_row_numbers_updated(self, row_mapping):
+        self.tabbed_emotion_control.update_tab_numbers(row_mapping)
+
     def load_model(self, paths):
-        """モデルを読み込む"""
-        success = self.tts_engine.load_model(
-            paths['model_path'],
-            paths['config_path'], 
-            paths['style_path']
-        )
-        
+        success = self.tts_engine.load_model(paths['model_path'], paths['config_path'], paths['style_path'])
         if success:
-            model_name = Path(paths['model_path']).stem
-            print(f"モデル読み込み完了: {model_name}")
-            
-            # 履歴に追加（新規の場合のみ）
-            self.model_manager.add_model(
-                paths['model_path'],
-                paths['config_path'],
-                paths['style_path']
-            )
-            
-            # ボタンを有効化
+            # 履歴に追加（名前は ModelManager 側で親フォルダ名へ整形）
+            self.model_manager.add_model(paths['model_path'], paths['config_path'], paths['style_path'])
             self.sequential_play_btn.setEnabled(True)
             self.save_individual_btn.setEnabled(True)
             self.save_continuous_btn.setEnabled(True)
         else:
-            print("モデル読み込み失敗")
-            # ボタンを無効化
             self.sequential_play_btn.setEnabled(False)
             self.save_individual_btn.setEnabled(False)
             self.save_continuous_btn.setEnabled(False)
-    
+
+    # 以下、既存の synth / save 系はそのまま（省略なしで使ってOK）
     def on_parameters_changed(self, row_id, params):
-        """感情制御パラメータが変更された時の処理"""
         print(f"行 {row_id} のパラメータ更新: {params}")
-    
+
     def play_single_text(self, row_id, text, parameters):
-        """単一テキストを再生（個別パラメータ使用）"""
         if not self.tts_engine.is_loaded:
             print("モデルが読み込まれていません")
             return
-        
-        # タブ式コントロールから個別パラメータを取得
-        tab_parameters = self.tabbed_emotion_control.get_parameters(row_id)
-        if tab_parameters:
-            parameters = tab_parameters
-            print(f"タブパラメータ使用: {tab_parameters}")
-        else:
-            print(f"デフォルトパラメータ使用: {parameters}")
-        
+        tab_parameters = self.tabbed_emotion_control.get_parameters(row_id) or parameters
         try:
             print(f"行 {row_id} を再生: {text}")
-            
-            # 音声合成
-            sr, audio = self.tts_engine.synthesize(text, **parameters)
-            
-            # バックグラウンドで再生
+            sr, audio = self.tts_engine.synthesize(text, **tab_parameters)
             import sounddevice as sd
             sd.play(audio, sr, blocking=False)
-            
         except Exception as e:
             print(f"音声合成エラー: {str(e)}")
     
