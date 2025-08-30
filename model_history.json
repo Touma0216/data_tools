@@ -6,10 +6,11 @@
       "model_path": "C:\\Users\\masa2\\Downloads\\copy_honoka\\honoka_model_e30_s300.safetensors",
       "config_path": "C:\\Users\\masa2\\Downloads\\copy_honoka\\config.json",
       "style_path": "C:\\Users\\masa2\\Downloads\\copy_honoka\\style_vectors.npy",
-      "created_at": "2025-08-29T08:52:20.818177",
-      "last_used": "2025-08-30T10:44:41.329506",
-      "use_count": 31
+      "created_at": "2025-08-30T11:11:44.616113",
+      "last_used": "2025-08-30T11:17:48.209662",
+      "use_count": 5,
+      "note": ""
     }
   ],
-  "last_updated": "2025-08-30T10:44:41.329506"
+  "last_updated": "2025-08-30T11:17:48.209662"
 }

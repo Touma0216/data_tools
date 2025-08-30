@@ -55,6 +55,7 @@ class ModelManager:
         model_entry = {
             'id': model_id,
             'name': model_name,
+            'note': "",
             'model_path': model_path,
             'config_path': config_path,
             'style_path': style_path,
@@ -158,3 +159,12 @@ class ModelManager:
                 return dt.strftime("%m/%d")
         except:
             return "不明"
+
+    def update_note(self, model_id: str, note: str) -> bool:
+        """モデルのメモを更新して保存"""
+        model = self.get_model_by_id(model_id)
+        if model is None:
+            return False
+        model['note'] = note
+        self.save_history()
+        return True

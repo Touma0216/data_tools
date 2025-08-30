@@ -8,6 +8,7 @@ from PyQt6.QtGui import QFont, QAction, QIcon
 
 # 自作モジュール
 # 注: 相対パスでのインポートに変更
+from .model_history import ModelHistoryWidget
 from .model_loader import ModelLoaderDialog
 from .tabbed_emotion_control import TabbedEmotionControl
 from .multi_text import MultiTextWidget
@@ -293,129 +294,46 @@ class TTSStudioMainWindow(QMainWindow):
         dialog.exec()
         
     def show_model_history_dialog(self):
-        """モデル履歴選択ダイアログを表示"""
-        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QListWidget, QListWidgetItem, QPushButton, QHBoxLayout, QMessageBox
-        
-        models = self.model_manager.get_all_models()
-        if not models:
+        """モデル履歴選択ダイアログ（✎改名・×削除付き）"""
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout
+
+        # 履歴が空なら案内
+        if not self.model_manager.get_all_models():
+            from PyQt6.QtWidgets import QMessageBox
             QMessageBox.information(self, "履歴なし", "モデル履歴がありません。")
             return
-        
-        # ダイアログ作成
-        dialog = QDialog(self)
-        dialog.setWindowTitle("モデル履歴から選択")
-        dialog.setModal(True)
-        dialog.resize(500, 400)
 
-        # ダイアログ全体にスタイルシートを適用
-        dialog.setStyleSheet("""
-            QDialog {
-                background-color: #f8f9fa;
-            }
-
-            QPushButton {
-                background-color: #f0f0f0;
-                color: #333333;
-                border: 1px solid #cccccc;
-                border-radius: 4px;
-                padding: 5px 12px;
-            }
-            QPushButton:hover {
-                background-color: #e9ecef;
-            }
-            QPushButton#loadBtn {
-                background-color: #4caf50;
-                color: white;
-                font-weight: bold;
-                border: none;
-            }
-            QPushButton#loadBtn:hover {
-                background-color: #45a049;
-            }
-
-            QListWidget {
-                border: 1px solid #dee2e6;
-                border-radius: 4px;
-                background-color: #ffffff;
-                padding: 5px;
-            }
-
-            /* 全アイテムに“やわらかい黒枠”を付与 */
-            QListWidget::item {
-                padding: 8px;
-                border: 1px solid #cccccc;
-                border-radius: 4px;
-                margin-bottom: 4px;  /* アイテム間の区切り */
-            }
-
-            /* 選択時は色を変えて強調 */
-            QListWidget::item:selected,
-            QListWidget::item:selected:active,
-            QListWidget::item:selected:!active {
-                background-color: #e3f2fd;
-                color: #333333;
-                border: 1px solid #888888;
-                border-radius: 4px;
-            }
-
-            /* 点線フォーカスを完全に消す */
-            QListWidget::item:focus {
-                outline: none;
-            }
-
-            QListWidget::item:focus:!selected {
-                border: 1px solid #cccccc; /* 未選択でも黒縁は残す */
-            }
-
-            QListWidget::item:selected:focus {
-                border: 1px solid #888888; /* 選択時は太めの黒縁 */
-                border-radius: 4px;
-            }
-
-            /* リスト全体のフォーカス枠も不要なら */
-            QListView::focus {
-                outline: none;
-                border: none;
-            }
+        dlg = QDialog(self)
+        dlg.setWindowTitle("モデル履歴から選択")
+        dlg.setModal(True)
+        dlg.resize(560, 420)
+        dlg.setStyleSheet("""
+            QDialog { background:#f8f9fa; }
         """)
 
-        layout = QVBoxLayout(dialog)
-        
-        # リストウィジェット
-        history_list = QListWidget()
-        
-        for model_data in models:
-            item_text = f"モデル名: {model_data['name']}\n最終使用: {self.model_manager.get_formatted_datetime(model_data.get('last_used', ''))}"
-            
-            list_item = QListWidgetItem(item_text)
-            list_item.setData(Qt.ItemDataRole.UserRole, model_data)
-            
-            # ファイル存在チェック
+        lay = QVBoxLayout(dlg)
+        widget = ModelHistoryWidget(self.model_manager, dlg)
+
+        # 履歴ウィジェットから「読み込み」が飛んできたら実ロード
+        def _on_selected(model_data):
+            # ファイル存在チェック（保険）
             if not self.model_manager.validate_model_files(model_data):
-                list_item.setText(item_text + "\n[ファイルが見つかりません]")
-                list_item.setForeground(Qt.GlobalColor.red)
-            
-            history_list.addItem(list_item)
-        
-        layout.addWidget(history_list)
-        
-        # ボタン
-        button_layout = QHBoxLayout()
-        
-        cancel_btn = QPushButton("キャンセル")
-        cancel_btn.clicked.connect(dialog.reject)
-        
-        load_btn = QPushButton("読み込み")
-        load_btn.setObjectName("loadBtn")
-        load_btn.clicked.connect(lambda: self.load_selected_model(dialog, history_list))
-        
-        button_layout.addStretch()
-        button_layout.addWidget(cancel_btn)
-        button_layout.addWidget(load_btn)
-        
-        layout.addLayout(button_layout)
-        
-        dialog.exec()
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.warning(dlg, "エラー", "モデルファイルが見つかりません。")
+                return
+            paths = {
+                'model_path': model_data['model_path'],
+                'config_path': model_data['config_path'],
+                'style_path': model_data['style_path'],
+            }
+            dlg.accept()
+            self.load_model(paths)                  # 実ロード
+            self.model_manager.update_last_used(model_data['id'])  # 使用日時更新
+
+        widget.model_selected.connect(_on_selected)
+        lay.addWidget(widget)
+        dlg.exec()
+
     
     def load_selected_model(self, dialog, history_list):
         """選択されたモデルを読み込み"""
