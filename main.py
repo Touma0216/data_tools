@@ -4,11 +4,10 @@ from pathlib import Path
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QPushButton, QLabel, QFileDialog)
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QAction
 
 # 自作モジュール
 from ui.model_loader import ModelLoaderDialog
-from ui.model_history import ModelHistoryWidget
 from ui.tabbed_emotion_control import TabbedEmotionControl
 from ui.multi_text import MultiTextWidget
 from core.tts_engine import TTSEngine
@@ -32,6 +31,9 @@ class TTSStudioMainWindow(QMainWindow):
         self.setWindowTitle("TTSスタジオ - ほのかちゃん")
         self.setGeometry(100, 100, 1200, 800)
         
+        # メニューバーを作成
+        self.create_menu_bar()
+        
         # 中央ウィジェット
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -40,43 +42,6 @@ class TTSStudioMainWindow(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         main_layout.setSpacing(10)
         main_layout.setContentsMargins(15, 15, 15, 15)
-        
-        # ヘッダー部分（モデル読み込み関連）
-        header_layout = QHBoxLayout()
-        
-        # モデル状態表示
-        self.model_status_label = QLabel("モデル: 未読み込み")
-        self.model_status_label.setStyleSheet("""
-            QLabel {
-                padding: 8px;
-                background-color: #ffebee;
-                border: 1px solid #e57373;
-                border-radius: 4px;
-                color: #d32f2f;
-                font-weight: bold;
-            }
-        """)
-        
-        # モデル読み込みボタン
-        self.load_model_btn = QPushButton("モデルを読み込み")
-        self.load_model_btn.setMinimumHeight(40)
-        self.load_model_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2196f3;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #1976d2;
-            }
-        """)
-        self.load_model_btn.clicked.connect(self.open_model_loader)
-        
-        header_layout.addWidget(self.model_status_label, 1)
-        header_layout.addWidget(self.load_model_btn, 0)
         
         # メインコンテンツエリア
         content_layout = QHBoxLayout()
@@ -102,7 +67,7 @@ class TTSStudioMainWindow(QMainWindow):
         # 初期タブを作成（MultiTextWidgetの初期行 "initial" に対応）
         self.tabbed_emotion_control.add_text_row("initial", 1)
         
-        # 制御ボタン（新しい3つ）
+        # 制御ボタン（3つ）
         controls_layout = QHBoxLayout()
         controls_layout.addStretch()
         
@@ -188,19 +153,92 @@ class TTSStudioMainWindow(QMainWindow):
         left_layout.addWidget(self.tabbed_emotion_control, 1)
         left_layout.addLayout(controls_layout)
         
-        # 右側: モデル履歴
-        self.model_history = ModelHistoryWidget(self.model_manager)
-        self.model_history.model_selected.connect(self.load_model_from_history)
-        self.model_history.setMaximumWidth(300)
-        self.model_history.setMinimumWidth(250)
+        # 右側: Live2D表示エリア
+        self.live2d_widget = QWidget()
+        self.live2d_widget.setMaximumWidth(300)
+        self.live2d_widget.setMinimumWidth(250)
+        self.live2d_widget.setStyleSheet("""
+            QWidget {
+                background-color: #f5f5f5;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+        """)
+        
+        live2d_layout = QVBoxLayout(self.live2d_widget)
+        live2d_label = QLabel("Live2D\nリップシンクエリア")
+        live2d_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        live2d_label.setStyleSheet("color: #666; font-size: 14px; border: none;")
+        live2d_layout.addWidget(live2d_label)
         
         # メインコンテンツレイアウト
         content_layout.addLayout(left_layout, 1)
-        content_layout.addWidget(self.model_history, 0)
+        content_layout.addWidget(self.live2d_widget, 0)
         
         # レイアウトに追加
-        main_layout.addLayout(header_layout)
         main_layout.addLayout(content_layout)
+
+    def create_menu_bar(self):
+        """メニューバーを作成"""
+        menubar = self.menuBar()
+        menubar.setStyleSheet("""
+            QMenuBar {
+                background-color: #f8f9fa;
+                color: #333;
+                border-bottom: 1px solid #dee2e6;
+                padding: 4px;
+            }
+            QMenuBar::item {
+                background-color: transparent;
+                padding: 6px 12px;
+                margin: 0px 2px;
+                border-radius: 4px;
+            }
+            QMenuBar::item:selected {
+                background-color: #e9ecef;
+            }
+            QMenuBar::item:pressed {
+                background-color: #dee2e6;
+            }
+            QMenu {
+                background-color: white;
+                border: 1px solid #dee2e6;
+                border-radius: 6px;
+                padding: 4px 0px;
+            }
+            QMenu::item {
+                padding: 8px 20px;
+                margin: 2px 4px;
+                border-radius: 4px;
+            }
+            QMenu::item:selected {
+                background-color: #e3f2fd;
+                color: #1976d2;
+            }
+            QMenu::separator {
+                height: 1px;
+                background-color: #dee2e6;
+                margin: 4px 8px;
+            }
+        """)
+        
+        # ファイルメニュー
+        file_menu = menubar.addMenu("ファイル")
+        
+        # モデル読み込みアクション
+        load_model_action = QAction("📁 モデルを読み込み", self)
+        load_model_action.setStatusTip("Style-Bert-VITS2モデルを読み込む")
+        load_model_action.triggered.connect(self.open_model_loader)
+        file_menu.addAction(load_model_action)
+        
+        # 区切り線
+        file_menu.addSeparator()
+        
+        # モデル履歴から読み込みアクション
+        load_from_history_action = QAction("📋 モデル履歴から読み込み", self)
+        load_from_history_action.setStatusTip("過去に読み込んだモデルから選択")
+        load_from_history_action.triggered.connect(self.show_model_history_dialog)
+        file_menu.addAction(load_from_history_action)
     
     def trim_silence(self, audio, sample_rate, threshold=0.03):
         """音声データの末尾無音を削除"""
@@ -233,10 +271,97 @@ class TTSStudioMainWindow(QMainWindow):
         dialog.model_loaded.connect(self.load_model)
         dialog.exec()
         
+    def show_model_history_dialog(self):
+        """モデル履歴選択ダイアログを表示"""
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QListWidget, QListWidgetItem, QPushButton, QHBoxLayout, QMessageBox
+        
+        models = self.model_manager.get_all_models()
+        if not models:
+            QMessageBox.information(self, "履歴なし", "モデル履歴がありません。")
+            return
+        
+        # ダイアログ作成
+        dialog = QDialog(self)
+        dialog.setWindowTitle("モデル履歴から選択")
+        dialog.setModal(True)
+        dialog.resize(500, 400)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # リストウィジェット
+        history_list = QListWidget()
+        
+        for model_data in models:
+            item_text = f"{model_data['name']}\n最終使用: {self.model_manager.get_formatted_datetime(model_data.get('last_used', ''))}\n{model_data['model_path']}"
+            
+            list_item = QListWidgetItem(item_text)
+            list_item.setData(Qt.ItemDataRole.UserRole, model_data)
+            
+            # ファイル存在チェック
+            if not self.model_manager.validate_model_files(model_data):
+                list_item.setText(item_text + "\n[ファイルが見つかりません]")
+                list_item.setBackground(Qt.GlobalColor.lightGray)
+            
+            history_list.addItem(list_item)
+        
+        layout.addWidget(history_list)
+        
+        # ボタン
+        button_layout = QHBoxLayout()
+        
+        cancel_btn = QPushButton("キャンセル")
+        cancel_btn.clicked.connect(dialog.reject)
+        
+        load_btn = QPushButton("読み込み")
+        load_btn.clicked.connect(lambda: self.load_selected_model(dialog, history_list))
+        load_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4caf50;
+                color: white;
+                font-weight: bold;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+            }
+        """)
+        
+        button_layout.addStretch()
+        button_layout.addWidget(cancel_btn)
+        button_layout.addWidget(load_btn)
+        
+        layout.addLayout(button_layout)
+        
+        dialog.exec()
+    
+    def load_selected_model(self, dialog, history_list):
+        """選択されたモデルを読み込み"""
+        current_item = history_list.currentItem()
+        if not current_item:
+            return
+        
+        model_data = current_item.data(Qt.ItemDataRole.UserRole)
+        
+        # ファイル存在チェック
+        if not self.model_manager.validate_model_files(model_data):
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(dialog, "エラー", "モデルファイルが見つかりません。")
+            return
+        
+        # モデル読み込み
+        paths = {
+            'model_path': model_data['model_path'],
+            'config_path': model_data['config_path'],
+            'style_path': model_data['style_path']
+        }
+        
+        dialog.accept()
+        self.load_model(paths)
+        
+        # 履歴を更新（最終使用日時）
+        self.model_manager.update_last_used(model_data['id'])
+        
     def load_model(self, paths):
         """モデルを読み込む"""
-        self.update_model_status("読み込み中...", False)
-        
         success = self.tts_engine.load_model(
             paths['model_path'],
             paths['config_path'], 
@@ -245,28 +370,25 @@ class TTSStudioMainWindow(QMainWindow):
         
         if success:
             model_name = Path(paths['model_path']).stem
-            self.update_model_status(f"読み込み完了 ({model_name})", True)
+            print(f"モデル読み込み完了: {model_name}")
             
-            # モデルを履歴に追加
+            # 履歴に追加（新規の場合のみ）
             self.model_manager.add_model(
                 paths['model_path'],
                 paths['config_path'],
                 paths['style_path']
             )
             
-            # 履歴リストを更新
-            self.model_history.refresh_list()
+            # ボタンを有効化
+            self.sequential_play_btn.setEnabled(True)
+            self.save_individual_btn.setEnabled(True)
+            self.save_continuous_btn.setEnabled(True)
         else:
-            self.update_model_status("読み込み失敗", False)
-    
-    def load_model_from_history(self, model_data):
-        """履歴からモデルを読み込む"""
-        paths = {
-            'model_path': model_data['model_path'],
-            'config_path': model_data['config_path'],
-            'style_path': model_data['style_path']
-        }
-        self.load_model(paths)
+            print("モデル読み込み失敗")
+            # ボタンを無効化
+            self.sequential_play_btn.setEnabled(False)
+            self.save_individual_btn.setEnabled(False)
+            self.save_continuous_btn.setEnabled(False)
     
     def on_parameters_changed(self, row_id, params):
         """感情制御パラメータが変更された時の処理"""
@@ -541,43 +663,6 @@ class TTSStudioMainWindow(QMainWindow):
             print(f"連続保存エラー: {str(e)}")
             self.save_continuous_btn.setEnabled(True)
             self.save_continuous_btn.setText("連続保存")
-        
-    def update_model_status(self, status_text, is_loaded=False):
-        """モデル読み込み状態を更新"""
-        self.model_status_label.setText(f"モデル: {status_text}")
-        
-        if is_loaded:
-            # 読み込み成功
-            self.model_status_label.setStyleSheet("""
-                QLabel {
-                    padding: 8px;
-                    background-color: #e8f5e8;
-                    border: 1px solid #4caf50;
-                    border-radius: 4px;
-                    color: #2e7d32;
-                    font-weight: bold;
-                }
-            """)
-            # 新しいボタンを有効化
-            self.sequential_play_btn.setEnabled(True)
-            self.save_individual_btn.setEnabled(True)
-            self.save_continuous_btn.setEnabled(True)
-        else:
-            # 読み込み失敗または未読み込み
-            self.model_status_label.setStyleSheet("""
-                QLabel {
-                    padding: 8px;
-                    background-color: #ffebee;
-                    border: 1px solid #e57373;
-                    border-radius: 4px;
-                    color: #d32f2f;
-                    font-weight: bold;
-                }
-            """)
-            # 新しいボタンを無効化
-            self.sequential_play_btn.setEnabled(False)
-            self.save_individual_btn.setEnabled(False)
-            self.save_continuous_btn.setEnabled(False)
 
 def main():
     """メイン関数"""
