@@ -2,15 +2,15 @@ import sys
 import os
 from pathlib import Path
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
-                            QHBoxLayout, QPushButton, QLabel, QFileDialog)
+                            QHBoxLayout, QPushButton, QLabel, QFileDialog, QStyle, QFrame)
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QAction
+from PyQt6.QtGui import QFont, QAction, QIcon
 
 # 自作モジュール
-# 注: ここは相対パスでインポートするように修正する必要があるかもしれません
-from ui.model_loader import ModelLoaderDialog
-from ui.tabbed_emotion_control import TabbedEmotionControl
-from ui.multi_text import MultiTextWidget
+# 注: 相対パスでのインポートに変更
+from .model_loader import ModelLoaderDialog
+from .tabbed_emotion_control import TabbedEmotionControl
+from .multi_text import MultiTextWidget
 from core.tts_engine import TTSEngine
 from core.model_manager import ModelManager
 
@@ -61,6 +61,12 @@ class TTSStudioMainWindow(QMainWindow):
         # パラメータエリア
         params_label = QLabel("音声パラメータ:")
         params_label.setFont(QFont("", 10, QFont.Weight.Bold))
+
+        # UIの区切り線を追加
+        section_divider = QFrame()
+        section_divider.setFrameShape(QFrame.Shape.HLine)
+        section_divider.setFrameShadow(QFrame.Shadow.Sunken)
+        section_divider.setStyleSheet("color: #dee2e6;")
         
         # タブ式感情制御ウィジェット
         self.tabbed_emotion_control = TabbedEmotionControl()
@@ -75,72 +81,84 @@ class TTSStudioMainWindow(QMainWindow):
         
         # 連続再生ボタン
         self.sequential_play_btn = QPushButton("連続して再生")
-        self.sequential_play_btn.setMinimumHeight(40)
+        self.sequential_play_btn.setMinimumHeight(35)
         self.sequential_play_btn.setEnabled(False)
         self.sequential_play_btn.setStyleSheet("""
             QPushButton {
-                background-color: #ff9800;
-                color: white;
-                border: none;
+                background-color: #f0f0f0; /* 薄いグレー */
+                color: #333333; /* 濃いグレーの文字 */
+                border: 1px solid #cccccc;
                 border-radius: 4px;
                 font-size: 13px;
                 font-weight: bold;
                 padding: 0 16px;
             }
             QPushButton:hover:enabled {
-                background-color: #f57c00;
+                background-color: #e0e0e0;
+            }
+            QPushButton:pressed:enabled {
+                background-color: #d0d0d0;
             }
             QPushButton:disabled {
-                background-color: #cccccc;
-                color: #666666;
+                background-color: #f8f8f8;
+                color: #aaaaaa;
+                border: 1px solid #e5e5e5;
             }
         """)
         self.sequential_play_btn.clicked.connect(self.play_sequential)
         
         # 個別保存ボタン
         self.save_individual_btn = QPushButton("個別保存")
-        self.save_individual_btn.setMinimumHeight(40)
+        self.save_individual_btn.setMinimumHeight(35)
         self.save_individual_btn.setEnabled(False)
         self.save_individual_btn.setStyleSheet("""
             QPushButton {
-                background-color: #4caf50;
-                color: white;
-                border: none;
+                background-color: #f0f0f0;
+                color: #333333;
+                border: 1px solid #cccccc;
                 border-radius: 4px;
                 font-size: 13px;
                 font-weight: bold;
                 padding: 0 16px;
             }
             QPushButton:hover:enabled {
-                background-color: #45a049;
+                background-color: #e0e0e0;
+            }
+            QPushButton:pressed:enabled {
+                background-color: #d0d0d0;
             }
             QPushButton:disabled {
-                background-color: #cccccc;
-                color: #666666;
+                background-color: #f8f8f8;
+                color: #aaaaaa;
+                border: 1px solid #e5e5e5;
             }
         """)
         self.save_individual_btn.clicked.connect(self.save_individual)
         
         # 連続保存ボタン
         self.save_continuous_btn = QPushButton("連続保存")
-        self.save_continuous_btn.setMinimumHeight(40)
+        self.save_continuous_btn.setMinimumHeight(35)
         self.save_continuous_btn.setEnabled(False)
         self.save_continuous_btn.setStyleSheet("""
             QPushButton {
-                background-color: #9c27b0;
-                color: white;
-                border: none;
+                background-color: #f0f0f0;
+                color: #333333;
+                border: 1px solid #cccccc;
                 border-radius: 4px;
                 font-size: 13px;
                 font-weight: bold;
                 padding: 0 16px;
             }
             QPushButton:hover:enabled {
-                background-color: #7b1fa2;
+                background-color: #e0e0e0;
+            }
+            QPushButton:pressed:enabled {
+                background-color: #d0d0d0;
             }
             QPushButton:disabled {
-                background-color: #cccccc;
-                color: #666666;
+                background-color: #f8f8f8;
+                color: #aaaaaa;
+                border: 1px solid #e5e5e5;
             }
         """)
         self.save_continuous_btn.clicked.connect(self.save_continuous)
@@ -152,6 +170,7 @@ class TTSStudioMainWindow(QMainWindow):
         # 左側レイアウト組み立て
         left_layout.addWidget(self.multi_text, 1)
         left_layout.addWidget(params_label)
+        left_layout.addWidget(section_divider)
         left_layout.addWidget(self.tabbed_emotion_control, 1)
         left_layout.addLayout(controls_layout)
         
@@ -161,8 +180,8 @@ class TTSStudioMainWindow(QMainWindow):
         self.live2d_widget.setMinimumWidth(250)
         self.live2d_widget.setStyleSheet("""
             QWidget {
-                background-color: #f5f5f5;
-                border: 1px solid #ddd;
+                background-color: #ffffff;
+                border: 1px solid #dee2e6;
                 border-radius: 4px;
             }
         """)
@@ -228,7 +247,7 @@ class TTSStudioMainWindow(QMainWindow):
         file_menu = menubar.addMenu("ファイル")
         
         # モデル読み込みアクション
-        load_model_action = QAction("📁 モデルを読み込み", self)
+        load_model_action = QAction(self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon), "モデルを読み込み", self)
         load_model_action.setStatusTip("Style-Bert-VITS2モデルを読み込む")
         load_model_action.triggered.connect(self.open_model_loader)
         file_menu.addAction(load_model_action)
@@ -237,7 +256,7 @@ class TTSStudioMainWindow(QMainWindow):
         file_menu.addSeparator()
         
         # モデル履歴から読み込みアクション
-        load_from_history_action = QAction("📋 モデル履歴から読み込み", self)
+        load_from_history_action = QAction(self.style().standardIcon(QStyle.StandardPixmap.SP_DriveFDIcon), "モデル履歴から読み込み", self)
         load_from_history_action.setStatusTip("過去に読み込んだモデルから選択")
         load_from_history_action.triggered.connect(self.show_model_history_dialog)
         file_menu.addAction(load_from_history_action)
@@ -287,14 +306,86 @@ class TTSStudioMainWindow(QMainWindow):
         dialog.setWindowTitle("モデル履歴から選択")
         dialog.setModal(True)
         dialog.resize(500, 400)
-        
+
+        # ダイアログ全体にスタイルシートを適用
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: #f8f9fa;
+            }
+
+            QPushButton {
+                background-color: #f0f0f0;
+                color: #333333;
+                border: 1px solid #cccccc;
+                border-radius: 4px;
+                padding: 5px 12px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+            QPushButton#loadBtn {
+                background-color: #4caf50;
+                color: white;
+                font-weight: bold;
+                border: none;
+            }
+            QPushButton#loadBtn:hover {
+                background-color: #45a049;
+            }
+
+            QListWidget {
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                background-color: #ffffff;
+                padding: 5px;
+            }
+
+            /* 全アイテムに“やわらかい黒枠”を付与 */
+            QListWidget::item {
+                padding: 8px;
+                border: 1px solid #cccccc;
+                border-radius: 4px;
+                margin-bottom: 4px;  /* アイテム間の区切り */
+            }
+
+            /* 選択時は色を変えて強調 */
+            QListWidget::item:selected,
+            QListWidget::item:selected:active,
+            QListWidget::item:selected:!active {
+                background-color: #e3f2fd;
+                color: #333333;
+                border: 1px solid #888888;
+                border-radius: 4px;
+            }
+
+            /* 点線フォーカスを完全に消す */
+            QListWidget::item:focus {
+                outline: none;
+            }
+
+            QListWidget::item:focus:!selected {
+                border: 1px solid #cccccc; /* 未選択でも黒縁は残す */
+            }
+
+            QListWidget::item:selected:focus {
+                border: 1px solid #888888; /* 選択時は太めの黒縁 */
+                border-radius: 4px;
+            }
+
+            /* リスト全体のフォーカス枠も不要なら */
+            QListView::focus {
+                outline: none;
+                border: none;
+            }
+        """)
+
         layout = QVBoxLayout(dialog)
         
         # リストウィジェット
         history_list = QListWidget()
         
         for model_data in models:
-            item_text = f"{model_data['name']}\n最終使用: {self.model_manager.get_formatted_datetime(model_data.get('last_used', ''))}\n{model_data['model_path']}"
+            item_text = f"モデル名: {model_data['name']}\n最終使用: {self.model_manager.get_formatted_datetime(model_data.get('last_used', ''))}"
             
             list_item = QListWidgetItem(item_text)
             list_item.setData(Qt.ItemDataRole.UserRole, model_data)
@@ -302,7 +393,7 @@ class TTSStudioMainWindow(QMainWindow):
             # ファイル存在チェック
             if not self.model_manager.validate_model_files(model_data):
                 list_item.setText(item_text + "\n[ファイルが見つかりません]")
-                list_item.setBackground(Qt.GlobalColor.lightGray)
+                list_item.setForeground(Qt.GlobalColor.red)
             
             history_list.addItem(list_item)
         
@@ -315,17 +406,8 @@ class TTSStudioMainWindow(QMainWindow):
         cancel_btn.clicked.connect(dialog.reject)
         
         load_btn = QPushButton("読み込み")
+        load_btn.setObjectName("loadBtn")
         load_btn.clicked.connect(lambda: self.load_selected_model(dialog, history_list))
-        load_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4caf50;
-                color: white;
-                font-weight: bold;
-                padding: 8px 16px;
-                border: none;
-                border-radius: 4px;
-            }
-        """)
         
         button_layout.addStretch()
         button_layout.addWidget(cancel_btn)
