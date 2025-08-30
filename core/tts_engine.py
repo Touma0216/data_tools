@@ -33,23 +33,40 @@ class TTSEngine:
     def load_model(self, model_path, config_path, style_path):
         """モデルを読み込む"""
         try:
-            # BERTモデルの読み込み
-            from style_bert_vits2.nlp import bert_models
-            from style_bert_vits2.constants import Languages
-            from style_bert_vits2.tts_model import TTSModel
+            # ログ出力を完全に抑制
+            import sys
+            import os
+            from io import StringIO
             
-            bert_models.load_model(Languages.JP, "ku-nlp/deberta-v2-large-japanese-char-wwm")
-            bert_models.load_tokenizer(Languages.JP, "ku-nlp/deberta-v2-large-japanese-char-wwm")
+            # stdout/stderrを一時的にリダイレクト
+            old_stdout = sys.stdout
+            old_stderr = sys.stderr
+            sys.stdout = StringIO()
+            sys.stderr = StringIO()
             
-            # TTSモデル読み込み
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            
-            self.model = TTSModel(
-                model_path=model_path,
-                config_path=config_path,
-                style_vec_path=style_path,
-                device=device,
-            )
+            try:
+                # BERTモデルの読み込み
+                from style_bert_vits2.nlp import bert_models
+                from style_bert_vits2.constants import Languages
+                from style_bert_vits2.tts_model import TTSModel
+                
+                bert_models.load_model(Languages.JP, "ku-nlp/deberta-v2-large-japanese-char-wwm")
+                bert_models.load_tokenizer(Languages.JP, "ku-nlp/deberta-v2-large-japanese-char-wwm")
+                
+                # TTSモデル読み込み
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                
+                self.model = TTSModel(
+                    model_path=model_path,
+                    config_path=config_path,
+                    style_vec_path=style_path,
+                    device=device,
+                )
+                
+            finally:
+                # stdout/stderrを復元
+                sys.stdout = old_stdout
+                sys.stderr = old_stderr
             
             # モデル情報を保存
             self.model_info = {
@@ -63,6 +80,9 @@ class TTSEngine:
             return True
             
         except Exception as e:
+            # エラー時もstdout/stderrを復元
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
             self.is_loaded = False
             return False
     
@@ -109,15 +129,30 @@ class TTSEngine:
             raise ValueError("テキストが空です")
             
         try:
-            # パラメータを準備
-            synth_params = self.default_params.copy()
-            synth_params.update(params)
-                        
-            # モデルの infer メソッドのシグネチャを確認して安全に呼び出し
-            kwargs = self._build_infer_kwargs(text, synth_params)
+            # ログ出力を抑制
+            import sys
+            from io import StringIO
             
-            # 音声合成実行
-            sr, audio = self.model.infer(**kwargs)
+            old_stdout = sys.stdout
+            old_stderr = sys.stderr
+            sys.stdout = StringIO()
+            sys.stderr = StringIO()
+            
+            try:
+                # パラメータを準備
+                synth_params = self.default_params.copy()
+                synth_params.update(params)
+                            
+                # モデルの infer メソッドのシグネチャを確認して安全に呼び出し
+                kwargs = self._build_infer_kwargs(text, synth_params)
+                
+                # 音声合成実行
+                sr, audio = self.model.infer(**kwargs)
+                
+            finally:
+                # stdout/stderrを復元
+                sys.stdout = old_stdout
+                sys.stderr = old_stderr
             
             # 結果チェック
             if audio is None or len(audio) == 0:
