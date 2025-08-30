@@ -208,4 +208,4 @@ class ModelLoaderDialog(QDialog):
             })
             self.accept()
         else:
-            print("エラー: 必要ファイルが不足しています")
+            pass

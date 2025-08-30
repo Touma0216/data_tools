@@ -69,7 +69,7 @@ class ModelManager:
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             if not quiet:
-                print("モデル履歴を保存しました")
+                pass
         except Exception as e:
             print(f"履歴保存エラー: {e}")
 

@@ -22,24 +22,17 @@ class TTSEngine:
     def load_model(self, model_path, config_path, style_path):
         """モデルを読み込む"""
         try:
-            print(f"モデル読み込み開始...")
-            print(f"モデルファイル: {model_path}")
-            print(f"コンフィグファイル: {config_path}")
-            print(f"スタイルファイル: {style_path}")
-            
+
             # BERTモデルの読み込み
             from style_bert_vits2.nlp import bert_models
             from style_bert_vits2.constants import Languages
             from style_bert_vits2.tts_model import TTSModel
             
-            print("BERTモデル読み込み中...")
             bert_models.load_model(Languages.JP, "ku-nlp/deberta-v2-large-japanese-char-wwm")
             bert_models.load_tokenizer(Languages.JP, "ku-nlp/deberta-v2-large-japanese-char-wwm")
             
             # TTSモデル読み込み
-            print("TTSモデル読み込み中...")
             device = "cuda" if torch.cuda.is_available() else "cpu"
-            print(f"使用デバイス: {device}")
             
             self.model = TTSModel(
                 model_path=model_path,
@@ -57,12 +50,9 @@ class TTSEngine:
             }
             
             self.is_loaded = True
-            print("モデル読み込み完了！")
             return True
             
         except Exception as e:
-            print(f"モデル読み込みエラー: {e}")
-            traceback.print_exc()
             self.is_loaded = False
             return False
     
@@ -81,18 +71,14 @@ class TTSEngine:
             # 学習済み感情を確認
             if 'data' in config and 'emotions' in config['data']:
                 emotions = config['data']['emotions']
-                print(f"学習済み感情: {emotions}")
                 return emotions
             elif 'emotions' in config:
                 emotions = config['emotions']
-                print(f"学習済み感情: {emotions}")
                 return emotions
             else:
-                print("config.jsonに感情情報が見つかりません")
-                
+                pass
         except Exception as e:
-            print(f"感情情報取得エラー: {e}")
-        
+            pass
         # デフォルト（一般的な感情リスト）
         return [
             "Neutral",
@@ -113,18 +99,14 @@ class TTSEngine:
             raise ValueError("テキストが空です")
             
         try:
-            print(f"音声合成開始: 「{text}」")
             
             # パラメータを準備
             synth_params = self.default_params.copy()
             synth_params.update(params)
-            
-            print(f"合成パラメータ: {synth_params}")
-            
+                        
             # モデルの infer メソッドのシグネチャを確認して安全に呼び出し
             kwargs = self._build_infer_kwargs(text, synth_params)
             
-            print(f"実際の引数: {kwargs}")
             
             # 音声合成実行
             sr, audio = self.model.infer(**kwargs)
@@ -133,14 +115,11 @@ class TTSEngine:
             if audio is None or len(audio) == 0:
                 raise RuntimeError("音声データが生成されませんでした")
                 
-            print(f"合成完了: 長さ={len(audio)/sr:.2f}秒, サンプルレート={sr}Hz")
             
             return sr, audio
             
         except Exception as e:
-            print(f"音声合成エラー: {e}")
-            traceback.print_exc()
-            raise
+            pass
     
     def _build_infer_kwargs(self, text, params):
         """infer() メソッドに渡す引数を安全に構築"""
@@ -151,7 +130,6 @@ class TTSEngine:
         sig = inspect.signature(self.model.infer)
         method_params = sig.parameters
         
-        print(f"利用可能なパラメータ: {list(method_params.keys())}")
         
         # テキスト引数
         kwargs = {}
@@ -165,81 +143,56 @@ class TTSEngine:
         # スタイル系
         if "style" in method_params:
             kwargs["style"] = params.get('style', 'Neutral')
-            print(f"styleをセット: {params.get('style', 'Neutral')}")
-        else:
-            print("警告: styleパラメータが見つかりません")
-            
+
         if "style_weight" in method_params:
             kwargs["style_weight"] = params.get('style_weight', 1.0)
-            print(f"style_weightをセット: {params.get('style_weight', 1.0)}")
         elif "emotion_weight" in method_params:
             kwargs["emotion_weight"] = params.get('style_weight', 1.0)
-            print(f"emotion_weightをセット: {params.get('style_weight', 1.0)}")
-        else:
-            print("警告: 感情強度パラメータが見つかりません")
-            
+
+
         # 長さ系（複数のパラメータ名をチェック）
         length_scale = params.get('length_scale', 0.85)
-        print(f"length_scale設定値: {length_scale}")
         
         if "length_scale" in method_params:
             kwargs["length_scale"] = length_scale
-            print(f"length_scaleをセット: {length_scale}")
         elif "duration_scale" in method_params:
             kwargs["duration_scale"] = length_scale
-            print(f"duration_scaleをセット: {length_scale}")
-        elif "speed" in method_params:
             # speedの場合は逆数になることが多い
             speed_value = 1.0 / length_scale
             kwargs["speed"] = speed_value
-            print(f"speedをセット: {speed_value} (length_scale {length_scale}の逆数)")
         elif "length" in method_params:
             kwargs["length"] = length_scale
-            print(f"lengthをセット: {length_scale}")
         else:
-            print(f"警告: 話速パラメータが見つかりません。利用可能: {list(method_params.keys())}")
-            
+            pass
         # SDP
         sdp_value = params.get('sdp_ratio', 0.25)
-        print(f"sdp_ratio設定値: {sdp_value}")
         
         if "sdp_ratio" in method_params:
             kwargs["sdp_ratio"] = sdp_value
-            print(f"sdp_ratioをセット: {sdp_value}")
         elif "sdp" in method_params:
             kwargs["sdp"] = sdp_value  
-            print(f"sdpをセット: {sdp_value}")
         else:
-            print("警告: SDPパラメータが見つかりません")
-            
+            pass
         # ノイズ系（優先順位: noise > noise_scale_w > noise_scale）
         noise_value = params.get('noise', 0.35)
-        print(f"noise設定値: {noise_value}")
         
         if "noise" in method_params:
             kwargs["noise"] = noise_value
-            print(f"noiseをセット: {noise_value}")
         elif "noise_scale_w" in method_params:
             kwargs["noise_scale_w"] = noise_value
-            print(f"noise_scale_wをセット: {noise_value}")
         elif "noise_scale" in method_params:
             kwargs["noise_scale"] = noise_value
-            print(f"noise_scaleをセット: {noise_value}")
         else:
-            print("警告: ノイズパラメータが見つかりません")
-        
+            pass
         # ピッチとイントネーション（新発見！）
         if "pitch_scale" in method_params:
             pitch_value = params.get('pitch_scale', 1.0)
             kwargs["pitch_scale"] = pitch_value
-            print(f"pitch_scaleをセット: {pitch_value}")
         
         if "intonation_scale" in method_params:
             intonation_value = params.get('intonation_scale', 1.0)
             kwargs["intonation_scale"] = intonation_value
-            print(f"intonation_scaleをセット: {intonation_value}")
         
-        print(f"設定されたパラメータ: {kwargs}")
         return kwargs
     
     def get_model_info(self):
@@ -257,5 +210,3 @@ class TTSEngine:
         # GPU メモリをクリア
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        
-        print("モデルをアンロードしました")

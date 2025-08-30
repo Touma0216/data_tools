@@ -302,8 +302,7 @@ class MultiTextWidget(QWidget):
     
     def on_row_parameters_changed(self, row_id, parameters):
         """行のパラメータが変更された"""
-        print(f"行 {row_id} のパラメータ更新: {parameters}")
-    
+        
     def play_single_row(self, row_id):
         """単一行を再生"""
         if row_id in self.text_rows:
@@ -314,8 +313,8 @@ class MultiTextWidget(QWidget):
             if text:
                 self.play_single_requested.emit(row_id, text, parameters)
             else:
-                print(f"行 {row_id} にテキストがありません")
-    
+                pass
+
     def play_all_rows(self):
         """全行を再生（削除 - メイン画面のボタンを使用）"""
         pass

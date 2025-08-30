@@ -233,45 +233,37 @@ class TTSStudioMainWindow(QMainWindow):
             paths["model_path"], paths["config_path"], paths["style_path"]
         )
         if success:
-            print(f"前回のモデル {last['name']} をロードしました")
             self.sequential_play_btn.setEnabled(True)
             self.save_individual_btn.setEnabled(True)
             self.save_continuous_btn.setEnabled(True)
         else:
-            print("前回のモデルのロードに失敗しました")
-
-    # 以下、既存の synth / save 系はそのまま（省略なしで使ってOK）
-    def on_parameters_changed(self, row_id, params):
-        print(f"行 {row_id} のパラメータ更新: {params}")
+            pass
 
     def play_single_text(self, row_id, text, parameters):
         if not self.tts_engine.is_loaded:
-            print("モデルが読み込まれていません")
             return
         tab_parameters = self.tabbed_emotion_control.get_parameters(row_id) or parameters
         try:
-            print(f"行 {row_id} を再生: {text}")
             sr, audio = self.tts_engine.synthesize(text, **tab_parameters)
             import sounddevice as sd
             sd.play(audio, sr, blocking=False)
         except Exception as e:
-            print(f"音声合成エラー: {str(e)}")
-    
+            pass
+
     def play_sequential(self):
         """連続して再生（1→2→3の順で、各タブのパラメータ使用）"""
         if not self.tts_engine.is_loaded:
-            print("モデルが読み込まれていません")
             return
         
         # 全テキストを取得
         texts_data = self.multi_text.get_all_texts_and_parameters()
         if not texts_data:
-            print("テキストを入力してください")
+            pass
             return
         
         try:
-            print(f"連続再生開始: {len(texts_data)}件")
-            
+            pass
+
             # ボタンを一時無効化
             self.sequential_play_btn.setEnabled(False)
             self.sequential_play_btn.setText("再生中...")
@@ -293,8 +285,6 @@ class TTSStudioMainWindow(QMainWindow):
                         'length_scale': 0.85, 'pitch_scale': 1.0,
                         'intonation_scale': 1.0, 'sdp_ratio': 0.25, 'noise': 0.35
                     }
-                
-                print(f"  {i}. 合成中: {text}")
                 
                 sr, audio = self.tts_engine.synthesize(text, **tab_parameters)
                 
@@ -319,7 +309,6 @@ class TTSStudioMainWindow(QMainWindow):
                 
                 # 末尾無音を削除
                 audio = self.trim_silence(audio, sample_rate)
-                print(f"音声 {i+1}: 元の長さ {len(all_audio[i])/sample_rate:.2f}秒 → 無音削除後 {len(audio)/sample_rate:.2f}秒")
                 
                 combined_audio.append(audio)
             
@@ -329,32 +318,27 @@ class TTSStudioMainWindow(QMainWindow):
             max_final = np.abs(final_audio).max()
             if max_final > 0.9:
                 final_audio = final_audio * (0.9 / max_final)
-                print(f"音量調整: {max_final:.3f} → 0.9")
             
             # バックグラウンドで再生
             import sounddevice as sd
             sd.play(final_audio, sample_rate, blocking=False)
-            
-            print(f"連続再生完了: 総時間 {len(final_audio)/sample_rate:.1f}秒")
             
             # ボタンを元に戻す
             self.sequential_play_btn.setEnabled(True)
             self.sequential_play_btn.setText("連続して再生")
             
         except Exception as e:
-            print(f"連続再生エラー: {str(e)}")
             self.sequential_play_btn.setEnabled(True)
             self.sequential_play_btn.setText("連続して再生")
     
     def save_individual(self):
         """個別保存（フォルダ内に個別ファイル）"""
         if not self.tts_engine.is_loaded:
-            print("モデルが読み込まれていません")
             return
         
         texts_data = self.multi_text.get_all_texts_and_parameters()
         if not texts_data:
-            print("テキストを入力してください")
+            pass
             return
         
         try:
@@ -385,7 +369,6 @@ class TTSStudioMainWindow(QMainWindow):
                             'intonation_scale': 1.0, 'sdp_ratio': 0.25, 'noise': 0.35
                         }
                     
-                    print(f"個別保存 {i}: {text}")
                     sr, audio = self.tts_engine.synthesize(text, **tab_parameters)
                     
                     # ファイル名生成
@@ -396,28 +379,21 @@ class TTSStudioMainWindow(QMainWindow):
                     file_path = os.path.join(folder_path, filename)
                     
                     sf.write(file_path, audio, sr)
-                    print(f"保存完了: {filename}")
-                
-                print(f"個別保存完了: {len(texts_data)}ファイル → {folder_path}")
-                
                 # ボタンを元に戻す
                 self.save_individual_btn.setEnabled(True)
                 self.save_individual_btn.setText("個別保存")
                 
         except Exception as e:
-            print(f"個別保存エラー: {str(e)}")
             self.save_individual_btn.setEnabled(True)
             self.save_individual_btn.setText("個別保存")
     
     def save_continuous(self):
         """連続保存（1つのWAVファイルに統合）"""
         if not self.tts_engine.is_loaded:
-            print("モデルが読み込まれていません")
             return
         
         texts_data = self.multi_text.get_all_texts_and_parameters()
         if not texts_data:
-            print("テキストを入力してください")
             return
         
         try:
@@ -454,7 +430,6 @@ class TTSStudioMainWindow(QMainWindow):
                             'intonation_scale': 1.0, 'sdp_ratio': 0.25, 'noise': 0.35
                         }
                     
-                    print(f"連続保存合成 {i}/{len(texts_data)}: {text}")
                     sr, audio = self.tts_engine.synthesize(text, **tab_parameters)
                     
                     if sample_rate is None:
@@ -485,17 +460,14 @@ class TTSStudioMainWindow(QMainWindow):
                 max_final = np.abs(final_audio).max()
                 if max_final > 0.9:
                     final_audio = final_audio * (0.9 / max_final)
-                    print(f"保存時音量調整: {max_final:.3f} → 0.9")
                 
                 # ファイル保存
                 sf.write(file_path, final_audio, sample_rate)
-                print(f"連続保存完了: {file_path} ({len(final_audio)/sample_rate:.1f}秒)")
                 
                 # ボタンを元に戻す
                 self.save_continuous_btn.setEnabled(True)
                 self.save_continuous_btn.setText("連続保存")
                 
         except Exception as e:
-            print(f"連続保存エラー: {str(e)}")
             self.save_continuous_btn.setEnabled(True)
             self.save_continuous_btn.setText("連続保存")
