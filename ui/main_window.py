@@ -20,6 +20,8 @@ class TTSStudioMainWindow(QMainWindow):
         self.model_manager = ModelManager()
         self.init_ui()
 
+        self.load_last_model()
+
     def init_ui(self):
         self.setWindowTitle("TTSスタジオ - ほのかちゃん")
         self.setGeometry(100, 100, 1200, 800)
@@ -56,22 +58,23 @@ class TTSStudioMainWindow(QMainWindow):
         controls = QHBoxLayout()
         controls.addStretch()
 
+        # --- ボタン群 ---
         self.sequential_play_btn = QPushButton("連続して再生")
         self.sequential_play_btn.setMinimumHeight(35)
         self.sequential_play_btn.setEnabled(False)
-        self.sequential_play_btn.setStyleSheet(self._gray_btn_css())
+        self.sequential_play_btn.setStyleSheet(self._blue_btn_css())
         self.sequential_play_btn.clicked.connect(self.play_sequential)
 
         self.save_individual_btn = QPushButton("個別保存")
         self.save_individual_btn.setMinimumHeight(35)
         self.save_individual_btn.setEnabled(False)
-        self.save_individual_btn.setStyleSheet(self._gray_btn_css())
+        self.save_individual_btn.setStyleSheet(self._green_btn_css())
         self.save_individual_btn.clicked.connect(self.save_individual)
 
         self.save_continuous_btn = QPushButton("連続保存")
         self.save_continuous_btn.setMinimumHeight(35)
         self.save_continuous_btn.setEnabled(False)
-        self.save_continuous_btn.setStyleSheet(self._gray_btn_css())
+        self.save_continuous_btn.setStyleSheet(self._orange_btn_css())
         self.save_continuous_btn.clicked.connect(self.save_continuous)
 
         controls.addWidget(self.sequential_play_btn)
@@ -101,19 +104,43 @@ class TTSStudioMainWindow(QMainWindow):
         content.addWidget(self.live2d_widget, 0)
         main.addLayout(content)
 
-    def _gray_btn_css(self) -> str:
+    # --- ボタン用CSS ---
+    def _blue_btn_css(self) -> str:
         return """
             QPushButton {
-                background-color: #f0f0f0; color: #333333;
-                border: 1px solid #cccccc; border-radius: 4px;
-                font-size: 13px; font-weight: bold; padding: 0 16px;
+                background-color: #1976d2; color: white;
+                border: none; border-radius: 4px;
+                font-size: 13px; font-weight: bold; padding: 6px 16px;
             }
-            QPushButton:hover:enabled { background-color: #e0e0e0; }
-            QPushButton:pressed:enabled { background-color: #d0d0d0; }
-            QPushButton:disabled {
-                background-color: #f8f8f8; color: #aaaaaa; border: 1px solid #e5e5e5;
-            }
+            QPushButton:hover:enabled { background-color: #1565c0; }
+            QPushButton:pressed:enabled { background-color: #0d47a1; }
+            QPushButton:disabled { background-color: #f0f0f0; color: #aaaaaa; }
         """
+
+    def _green_btn_css(self) -> str:
+        return """
+            QPushButton {
+                background-color: #4caf50; color: white;
+                border: none; border-radius: 4px;
+                font-size: 13px; font-weight: bold; padding: 6px 16px;
+            }
+            QPushButton:hover:enabled { background-color: #388e3c; }
+            QPushButton:pressed:enabled { background-color: #2e7d32; }
+            QPushButton:disabled { background-color: #f0f0f0; color: #aaaaaa; }
+        """
+
+    def _orange_btn_css(self) -> str:
+        return """
+            QPushButton {
+                background-color: #ff9800; color: white;
+                border: none; border-radius: 4px;
+                font-size: 13px; font-weight: bold; padding: 6px 16px;
+            }
+            QPushButton:hover:enabled { background-color: #f57c00; }
+            QPushButton:pressed:enabled { background-color: #e65100; }
+            QPushButton:disabled { background-color: #f0f0f0; color: #aaaaaa; }
+        """
+
 
     def create_menu_bar(self):
         menubar = self.menuBar()
@@ -190,18 +217,28 @@ class TTSStudioMainWindow(QMainWindow):
     def on_row_numbers_updated(self, row_mapping):
         self.tabbed_emotion_control.update_tab_numbers(row_mapping)
 
-    def load_model(self, paths):
-        success = self.tts_engine.load_model(paths['model_path'], paths['config_path'], paths['style_path'])
+    def load_last_model(self):
+        models = self.model_manager.get_all_models()
+        if not models:
+            return
+        last = models[0]  # 先頭が直近
+        if not self.model_manager.validate_model_files(last):
+            return
+        paths = {
+            "model_path": last["model_path"],
+            "config_path": last["config_path"],
+            "style_path": last["style_path"],
+        }
+        success = self.tts_engine.load_model(
+            paths["model_path"], paths["config_path"], paths["style_path"]
+        )
         if success:
-            # 履歴に追加（名前は ModelManager 側で親フォルダ名へ整形）
-            self.model_manager.add_model(paths['model_path'], paths['config_path'], paths['style_path'])
+            print(f"前回のモデル {last['name']} をロードしました")
             self.sequential_play_btn.setEnabled(True)
             self.save_individual_btn.setEnabled(True)
             self.save_continuous_btn.setEnabled(True)
         else:
-            self.sequential_play_btn.setEnabled(False)
-            self.save_individual_btn.setEnabled(False)
-            self.save_continuous_btn.setEnabled(False)
+            print("前回のモデルのロードに失敗しました")
 
     # 以下、既存の synth / save 系はそのまま（省略なしで使ってOK）
     def on_parameters_changed(self, row_id, params):
