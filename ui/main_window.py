@@ -175,7 +175,6 @@ class TTSStudioMainWindow(QMainWindow):
             }
             dlg.accept()
             self.load_model(paths)
-            self.model_manager.update_last_used(model_data['id'])
 
         widget.model_selected.connect(_on_selected)
         lay.addWidget(widget)

@@ -1,6 +1,7 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget,
-                            QListWidgetItem, QPushButton, QLabel, QLineEdit,
-                            QMessageBox)
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem,
+    QPushButton, QLabel, QLineEdit, QMessageBox
+)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 
@@ -163,7 +164,7 @@ class ModelHistoryWidget(QWidget):
     def load_model(self, model_id):
         m = self.model_manager.get_model_by_id(model_id)
         if m:
-            self.model_manager.update_last_used(model_id)
+            # update_last_used は削除済みなので呼ばない
             self.model_selected.emit(m)
             self.refresh_list()
 
