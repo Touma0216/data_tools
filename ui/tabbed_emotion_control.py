@@ -73,6 +73,7 @@ class SingleEmotionControl(QWidget):
         emotion_label.setMinimumWidth(80)
         
         self.emotion_combo = QComboBox()
+        self.emotion_combo.setToolTip("感情選択(E)")
         emotions = [
             ("Neutral", "😐 ニュートラル"),
             ("Happy", "😊 喜び"),

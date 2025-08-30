@@ -5,6 +5,7 @@ tts_studio/
 │   ├── __init__.py
 │   ├── main_window.py   # メインウィンドウ
 │   ├── tabbed_emotion_control.py # 感情コントロール
+│   ├── keyboard_shortcuts.py # キーボードショートカット
 │   ├── multi_text.py # 複数テキスト対応
 │   ├── model_history.py # モデル履歴保持
 │   └── model_loader.py  # モデル選択・読み込みUI

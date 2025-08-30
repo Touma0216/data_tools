@@ -33,6 +33,7 @@ original_stderr = sys.stderr
 from ui.main_window import TTSStudioMainWindow
 
 def main():
+    print("TTS_Studio起動中...")
     """メイン関数"""
     app = QApplication(sys.argv)
     

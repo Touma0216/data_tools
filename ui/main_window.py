@@ -10,6 +10,7 @@ from .model_history import ModelHistoryWidget
 from .model_loader import ModelLoaderDialog
 from .tabbed_emotion_control import TabbedEmotionControl
 from .multi_text import MultiTextWidget
+from .keyboard_shortcuts import KeyboardShortcutManager
 from core.tts_engine import TTSEngine
 from core.model_manager import ModelManager
 
@@ -19,6 +20,10 @@ class TTSStudioMainWindow(QMainWindow):
         self.tts_engine = TTSEngine()
         self.model_manager = ModelManager()
         self.init_ui()
+        
+        # キーボードショートカット設定
+        self.keyboard_shortcuts = KeyboardShortcutManager(self)
+        
         self.load_last_model()
 
     def init_ui(self):
@@ -58,19 +63,19 @@ class TTSStudioMainWindow(QMainWindow):
         controls.addStretch()
 
         # --- ボタン群 ---
-        self.sequential_play_btn = QPushButton("連続して再生")
+        self.sequential_play_btn = QPushButton("連続して再生(Ctrl + R)")
         self.sequential_play_btn.setMinimumHeight(35)
         self.sequential_play_btn.setEnabled(False)
         self.sequential_play_btn.setStyleSheet(self._blue_btn_css())
         self.sequential_play_btn.clicked.connect(self.play_sequential)
 
-        self.save_individual_btn = QPushButton("個別保存")
+        self.save_individual_btn = QPushButton("個別保存(Ctrl + S)")
         self.save_individual_btn.setMinimumHeight(35)
         self.save_individual_btn.setEnabled(False)
         self.save_individual_btn.setStyleSheet(self._green_btn_css())
         self.save_individual_btn.clicked.connect(self.save_individual)
 
-        self.save_continuous_btn = QPushButton("連続保存")
+        self.save_continuous_btn = QPushButton("連続保存(Ctrl + Shift + S)")
         self.save_continuous_btn.setMinimumHeight(35)
         self.save_continuous_btn.setEnabled(False)
         self.save_continuous_btn.setStyleSheet(self._orange_btn_css())
@@ -153,7 +158,7 @@ class TTSStudioMainWindow(QMainWindow):
             QMenu::separator { height: 1px; background-color: #dee2e6; margin: 4px 8px; }
         """)
 
-        file_menu = menubar.addMenu("ファイル")
+        file_menu = menubar.addMenu("ファイル(F)")
 
         load_model_action = QAction(self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon), "モデルを読み込み", self)
         load_model_action.setStatusTip("Style-Bert-VITS2モデルを読み込む")

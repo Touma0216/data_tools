@@ -66,10 +66,13 @@ class TextRowWidget(QWidget):
             }
         """)
         
+        # カスタムキーイベント処理
+        self.text_input.keyPressEvent = self.text_input_key_press
+        
         # 再生ボタン
         self.play_btn = QPushButton("▶")
         self.play_btn.setFixedSize(30, 30)
-        self.play_btn.setToolTip("この行を再生")
+        self.play_btn.setToolTip("この行を再生(R)")
         self.play_btn.setStyleSheet("""
             QPushButton {
                 background-color: #4caf50;
@@ -117,6 +120,25 @@ class TextRowWidget(QWidget):
                 margin: 2px 0;
             }
         """)
+    
+    def text_input_key_press(self, event):
+        """テキスト入力のキーイベント処理"""
+        from PyQt6.QtCore import Qt
+        from PyQt6.QtGui import QKeySequence
+        
+        # Ctrl+Enter: 改行挿入
+        if event.key() == Qt.Key.Key_Return and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            cursor = self.text_input.textCursor()
+            cursor.insertText("\n")
+            return
+        
+        # Enter単体: フォーカスを外す（テキスト選択終了）
+        elif event.key() == Qt.Key.Key_Return and event.modifiers() == Qt.KeyboardModifier.NoModifier:
+            self.text_input.clearFocus()
+            return
+        
+        # その他のキーは通常処理
+        QTextEdit.keyPressEvent(self.text_input, event)
     
     def get_text(self):
         """テキストを取得"""
@@ -189,7 +211,7 @@ class MultiTextWidget(QWidget):
         scroll_area.setWidget(self.rows_container)
         
         # 追加ボタン
-        add_btn = QPushButton("➕ テキスト行を追加")
+        add_btn = QPushButton("➕ テキスト行を追加(N)")
         add_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2196f3;
@@ -213,6 +235,10 @@ class MultiTextWidget(QWidget):
     
     def add_text_row(self, text="", parameters=None):
         """テキスト行を追加"""
+        # 9行制限
+        if len(self.text_rows) >= 9:
+            return None
+            
         row_widget = TextRowWidget(text=text, parameters=parameters)
         
         # シグナル接続
